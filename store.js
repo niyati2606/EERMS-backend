@@ -100,10 +100,21 @@ function seed() {
 // ---------- Persistence (JSON file) so data survives server restarts ----------
 const fs = require('fs');
 const path = require('path');
-const FILE = process.env.DATA_FILE || path.join(__dirname, 'data', 'store.json');
+const BUNDLED_FILE = path.join(__dirname, 'data', 'store.json');
+const FILE = process.env.DATA_FILE || (process.env.VERCEL ? path.join('/tmp', 'store.json') : BUNDLED_FILE);
+
 function loadFromDisk() {
   try {
-    const d = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    if (process.env.VERCEL && !fs.existsSync(FILE) && fs.existsSync(BUNDLED_FILE)) {
+      try {
+        fs.copyFileSync(BUNDLED_FILE, FILE);
+      } catch (err) {
+        console.warn('Could not copy bundled store to /tmp:', err.message);
+      }
+    }
+    const targetFile = fs.existsSync(FILE) ? FILE : (fs.existsSync(BUNDLED_FILE) ? BUNDLED_FILE : null);
+    if (!targetFile) return false;
+    const d = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
     ['users', 'bank', 'claims', 'notifications', 'audit'].forEach((k) => { db[k] = d[k] || []; });
     db.budget = d.budget || db.budget; db.seq = d.seq || db.seq;
     return db.users.length > 0;
