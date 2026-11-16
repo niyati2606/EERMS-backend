@@ -43,8 +43,104 @@ router.get('/employees/:id', (req, res) => {
 });
 
 router.get('/employees/:id/claims', (req, res) => {
-  const list = db.claims.filter((c) => c.employeeId === req.params.id && c.status !== 'DRAFT').sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-  res.json(list.map((c) => { const v = view(c, { withEmployee: false }); return { id: v.id, ticketRef: v.ticketRef, status: v.status, total: v.total, submittedAt: v.submittedAt, utr: v.utr }; }));
+  return res.status(403).json({ message: 'HR is not authorized to view claim history' });
+});
+
+// Finance staff management (HR)
+router.get('/finance', (req, res) => {
+  const list = db.users
+    .filter((u) => u.role === 'finance')
+    .map((u) => withBank(u))
+    .sort((a, b) => a.empCode.localeCompare(b.empCode));
+  res.json(list);
+});
+
+// Create finance employee (only name, email, phone, branch, employee code)
+router.post('/finance', async (req, res) => {
+  const b = req.body || {};
+  const errors = [];
+  const req_ = (k, label) => { if (!b[k] || !String(b[k]).trim()) errors.push(`${label} is required`); };
+  [['fullName', 'Full name'], ['email', 'Official email'], ['phone', 'Phone number'], ['branch', 'Branch']].forEach(([k, l]) => req_(k, l));
+  if (b.email && !EMAIL.test(b.email)) errors.push('Official email is invalid');
+  if (b.email && db.users.some((u) => u.email.toLowerCase() === b.email.toLowerCase())) errors.push('A user with this email already exists');
+  if (b.branch && !BRANCHES.includes(b.branch)) errors.push('Unknown branch');
+  if (errors.length) return res.status(400).json({ message: errors[0], errors });
+
+  const setupToken = crypto.randomBytes(32).toString('hex');
+  const setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
+  const setupTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  const origin = req.headers.origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const setupUrl = `${origin}/set-password?token=${setupToken}`;
+
+  let emailSent = false;
+  try {
+    await sendEmail(
+      b.email.trim().toLowerCase(),
+      'Set up your EERMS Finance account',
+      `Welcome to EERMS, ${b.fullName.trim()}.\nYour Finance account is ready. Set your password using this one-time link within 24 hours:\n${setupUrl}`
+    );
+    emailSent = true;
+  } catch (error) {
+    console.error('Failed to send finance password setup email:', error.message);
+  }
+
+  const user = addUser({
+    empCode: b.empCode && String(b.empCode).trim() ? String(b.empCode).trim() : nextEmpCode(),
+    fullName: b.fullName.trim(),
+    email: b.email.trim().toLowerCase(),
+    phone: String(b.phone).trim(),
+    branch: b.branch,
+    passwordHash: null,
+    role: 'finance',
+    status: 'pending',
+    designation: 'Finance Officer',
+    department: 'Finance',
+    costCenter: 'Finance - Accounts',
+    joiningDate: new Date().toISOString().split('T')[0],
+    reportingManager: '',
+    mustChange: false,
+    setupTokenHash,
+    setupTokenExpiresAt,
+  });
+
+  audit(req.user, 'FINANCE_USER_CREATED', user.empCode, `Finance staff created (${user.fullName})`, req.ip);
+  res.status(201).json({
+    employee: withBank(user),
+    message: emailSent ? 'Finance staff created and setup email sent.' : 'Finance staff created. Password setup link generated.',
+    setupUrl,
+  });
+});
+
+// Resend password setup email for any employee/finance user
+router.post('/employees/:id/resend-setup', async (req, res) => {
+  const u = db.users.find((x) => x.id === req.params.id);
+  if (!u) return res.status(404).json({ message: 'User not found' });
+
+  const setupToken = crypto.randomBytes(32).toString('hex');
+  u.setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
+  u.setupTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+
+  const origin = req.headers.origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const setupUrl = `${origin}/set-password?token=${setupToken}`;
+
+  let emailSent = false;
+  try {
+    await sendEmail(
+      u.email,
+      'Set up your EERMS password',
+      `Hello ${u.fullName},\n\nHere is your new password setup link for EERMS. It is valid for 24 hours:\n${setupUrl}`
+    );
+    emailSent = true;
+    audit(req.user, 'SETUP_EMAIL_RESENT', u.empCode, `Sent to ${u.email}`, req.ip);
+  } catch (error) {
+    console.error('Failed to send setup email:', error.message);
+    audit(req.user, 'SETUP_EMAIL_RESENT_SIMULATED', u.empCode, `Simulated for ${u.email}`, req.ip);
+  }
+
+  res.json({
+    message: emailSent ? `Password setup email sent to ${u.email}.` : `Setup link generated for ${u.email}.`,
+    setupUrl,
+  });
 });
 
 // Create employee — bank verification can be completed after the employee uploads a cheque.
@@ -82,7 +178,7 @@ router.post('/employees', chequeUpload.single('chequeFile'), async (req, res) =>
   }
 
   const user = addUser({
-    fullName: b.fullName.trim(), email: b.email.trim().toLowerCase(), passwordHash: null, role: 'employee', phone: b.phoneNumber, designation: '',
+    fullName: b.fullName.trim(), email: b.email.trim().toLowerCase(), passwordHash: null, role: 'employee', status: 'pending', phone: b.phoneNumber, designation: '',
     joiningDate: b.joiningDate, department: '', costCenter: '', branch: b.branchLocation,
     reportingManager: '', mustChange: false, setupTokenHash, setupTokenExpiresAt,
   });

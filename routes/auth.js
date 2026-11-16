@@ -14,6 +14,7 @@ router.post('/login', (req, res) => {
     audit(null, 'LOGIN_FAILED', 'auth', String(email), req.ip);
     return res.status(401).json({ message: 'Invalid email or password' });
   }
+  if (user.status === 'pending') return res.status(403).json({ message: 'Your account is pending password setup. Please check your email or contact HR for a setup link.' });
   if (user.status !== 'active') return res.status(403).json({ message: 'This account is frozen. Contact HR.' });
   audit(user, 'LOGIN', 'auth', 'Signed in', req.ip);
   res.json({ token: sign(user), user: publicUser(user), redirect: DASH[user.role] });
@@ -34,6 +35,7 @@ router.post('/setup-password', (req, res) => {
   user.setupTokenHash = null;
   user.setupTokenExpiresAt = null;
   user.mustChange = false;
+  user.status = 'active';
   audit(user, 'PASSWORD_SET', 'auth', 'Password set from onboarding link', req.ip);
   res.json({ message: 'Password created. You can now sign in.' });
 });
