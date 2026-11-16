@@ -5,14 +5,21 @@ const crypto = require('crypto');
 
 const RECEIPT_MAX = 200 * 1024; // 200 KB expense receipts
 const CHEQUE_MAX = 2 * 1024 * 1024; // 2 MB cancelled cheque (2,097,152 bytes)
-const ROOT = path.join(__dirname, '..', 'uploads');
+const BUNDLED_ROOT = path.join(__dirname, '..', 'uploads');
+const ROOT = process.env.VERCEL ? path.join('/tmp', 'uploads') : BUNDLED_ROOT;
 
 function make(sub, maxBytes) {
   const dir = path.join(ROOT, sub);
-  fs.mkdirSync(dir, { recursive: true });
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (_) {}
+
   return multer({
     storage: multer.diskStorage({
-      destination: dir,
+      destination: (req, file, cb) => {
+        try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+        cb(null, dir);
+      },
       filename: (req, f, cb) => cb(null, crypto.randomBytes(12).toString('hex') + path.extname(f.originalname).toLowerCase()),
     }),
     limits: { fileSize: maxBytes, files: 25 },

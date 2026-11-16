@@ -118,7 +118,9 @@ module.exports.receiptFileHandler = (req, res) => {
   if (!claim) return res.status(404).json({ message: 'Receipt not found' });
   const ok = claim.employeeId === req.user.id || ['finance', 'admin'].includes(req.user.role);
   if (!ok) return res.status(403).json({ message: 'Not allowed' });
-  const p = path.join(ROOT, 'receipts', file);
-  if (!fs.existsSync(p)) return res.status(404).json({ message: 'File missing' });
+  const p1 = path.join(ROOT, 'receipts', file);
+  const p2 = path.join(__dirname, '..', 'uploads', 'receipts', file);
+  const p = fs.existsSync(p1) ? p1 : (fs.existsSync(p2) ? p2 : null);
+  if (!p) return res.status(404).json({ message: 'File missing' });
   res.sendFile(p);
 };

@@ -148,8 +148,12 @@ router.get('/bank-verifications', (req, res) => {
 router.get('/bank/:userId/cheque', (req, res) => {
   const b = db.bank.find((x) => x.userId === req.params.userId);
   if (!b || !b.chequeFilePath) return res.status(404).json({ message: 'No cheque on file' });
-  const p = path.join(ROOT, 'cheques', path.basename(b.chequeFilePath));
-  fs.existsSync(p) ? res.sendFile(p) : res.status(404).json({ message: 'File missing' });
+  const filename = path.basename(b.chequeFilePath);
+  const p1 = path.join(ROOT, 'cheques', filename);
+  const p2 = path.join(__dirname, '..', 'uploads', 'cheques', filename);
+  const p = fs.existsSync(p1) ? p1 : (fs.existsSync(p2) ? p2 : null);
+  if (!p) return res.status(404).json({ message: 'File missing' });
+  res.sendFile(p);
 });
 
 router.post('/bank/:userId/decision', (req, res) => {
