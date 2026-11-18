@@ -193,12 +193,23 @@ router.put('/employees/:id', (req, res) => {
   const u = db.users.find((x) => x.id === req.params.id);
   if (!u) return res.status(404).json({ message: 'Employee not found' });
   const b = req.body || {};
+  const beforeBranch = u.branch;
+  const beforeEmail = u.email;
   if (b.branch && !BRANCHES.includes(b.branch)) return res.status(400).json({ message: 'Unknown branch' });
   if (b.joiningDate !== undefined && b.joiningDate !== '' && !isValidDate(b.joiningDate)) return res.status(400).json({ message: 'Joining date is invalid' });
-  const beforeBranch = u.branch;
+  if (b.email !== undefined) {
+    if (typeof b.email !== 'string' || !EMAIL.test(b.email.trim())) {
+      return res.status(400).json({ message: 'Official email is invalid' });
+    }
+    const email = b.email.trim().toLowerCase();
+    if (db.users.some((user) => user.id !== u.id && user.email.toLowerCase() === email)) {
+      return res.status(400).json({ message: 'A user with this email already exists' });
+    }
+    u.email = email;
+  }
   ['fullName', 'phone', 'branch'].forEach((k) => { if (b[k] !== undefined) u[k] = b[k]; });
   if (b.joiningDate !== undefined) u.joiningDate = b.joiningDate || null;
-  audit(req.user, 'EMPLOYEE_UPDATED', u.empCode, `${beforeBranch} → ${u.branch}`, req.ip);
+  audit(req.user, 'EMPLOYEE_UPDATED', u.empCode, `${beforeBranch} → ${u.branch}${beforeEmail !== u.email ? '; official email updated' : ''}`, req.ip);
   res.json(withBank(u));
 });
 
