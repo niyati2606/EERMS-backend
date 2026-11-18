@@ -41,21 +41,21 @@ app.use(express.json({ limit: '1mb' }));
 app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/auth/request-password-reset', rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false }));
 
-app.get('/', (req, res) => res.json({ ok: true, service: 'EERMS API', status: 'running' }));
-app.get('/api/health', (req, res) => res.json({ ok: true, store: getPersistenceType() }));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/employee', require('./routes/employee'));
-app.use('/api/claims', claims);
-app.use('/api/finance', require('./routes/finance'));
-app.use('/api/hr', require('./routes/hr'));
-app.use('/api/admin', require('./routes/admin'));
-app.get('/api/files/receipts/:file', auth, claims.receiptFileHandler);
+app.get(['/', '/api'], (req, res) => res.json({ ok: true, service: 'EERMS API', status: 'running' }));
+app.get(['/api/health', '/health'], (req, res) => res.json({ ok: true, store: getPersistenceType() }));
+app.use(['/api/auth', '/auth'], require('./routes/auth'));
+app.use(['/api/employee', '/employee'], require('./routes/employee'));
+app.use(['/api/claims', '/claims'], claims);
+app.use(['/api/finance', '/finance'], require('./routes/finance'));
+app.use(['/api/hr', '/hr'], require('./routes/hr'));
+app.use(['/api/admin', '/admin'], require('./routes/admin'));
+app.get(['/api/files/receipts/:file', '/files/receipts/:file'], auth, claims.receiptFileHandler);
 
-app.get('/api/notifications', auth, (req, res) => {
+app.get(['/api/notifications', '/notifications'], auth, (req, res) => {
   const list = db.notifications.filter((n) => n.userId === req.user.id).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   res.json({ unread: list.filter((n) => !n.read).length, items: list });
 });
-app.post('/api/notifications/read', auth, (req, res) => {
+app.post(['/api/notifications/read', '/notifications/read'], auth, (req, res) => {
   db.notifications.filter((n) => n.userId === req.user.id).forEach((n) => { n.read = true; });
   res.json({ ok: true });
 });

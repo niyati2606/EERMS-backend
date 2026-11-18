@@ -111,6 +111,9 @@ if (DATABASE_URL) {
   pgPool = new Pool({
     connectionString: DATABASE_URL,
     ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 10000,
+    max: 1,
   });
 }
 
@@ -216,10 +219,17 @@ async function initializeStore() {
       }
       if (!loaded) loaded = loadFromDisk();
       if (!loaded) seed();
-      await persist();
+      try {
+        await persist();
+      } catch (err) {
+        console.warn('Initial persist failed:', err.message);
+      }
       setInterval(() => persist(), 2000).unref();
       ['SIGINT', 'SIGTERM'].forEach((sig) => process.on(sig, () => { persist().finally(() => process.exit(0)); }));
-    })();
+    })().catch((err) => {
+      initializationPromise = null;
+      throw err;
+    });
   }
   return initializationPromise;
 }
