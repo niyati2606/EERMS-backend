@@ -1,1 +1,194 @@
-{"users":[{"id":"f605dc94-5c47-4336-a7dc-e888401ebcec","empCode":"EMP-0001","status":"active","mustChange":false,"phone":"","joiningDate":"2024-01-15","fullName":"Meera Kapoor","email":"admin@abcsolutions.com","passwordHash":"$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6","role":"admin","branch":"Corporate HQ"},{"id":"cc84834e-265d-4712-8d96-03fac3a649a2","empCode":"EMP-0002","status":"active","mustChange":false,"phone":"","joiningDate":"2024-01-15","fullName":"Priya Nair","email":"hr@abcsolutions.com","passwordHash":"$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6","role":"hr","branch":"Corporate HQ"},{"id":"9a994d48-1cac-49f8-9efc-c32b8730215c","empCode":"EMP-0003","status":"active","mustChange":false,"phone":"8320424730","fullName":"niyati","email":"niyatirpatel99@gmail.com","passwordHash":"$2a$08$Wng/dIXC5mSaeouyTBJLUuidu15QuRIC.EaAP754J0ppEUy9f3506","role":"employee","branch":"Branch A","joiningDate":"2026-11-26","setupTokenHash":null,"setupTokenExpiresAt":null,"passwordResetTokenHash":null,"passwordResetTokenExpiresAt":null}],"bank":[{"userId":"443cc118-ce81-4470-b6f2-d16df3752a7d","accountHolder":"Niyati","bankName":"sbi","accountNumber":"12345678909","ifsc":"ABCD0987789","status":"Verified","rejectReason":null,"verifiedAt":"2026-11-18T06:25:41.935Z","verificationChecklist":[true,true,true]},{"userId":"336ca644-c7bc-49c4-af26-3a459635d229","accountHolder":"abc","bankName":"test","accountNumber":"1233943243992993","ifsc":"ABCD0456321","status":"Pending","rejectReason":null,"verifiedAt":null,"verificationChecklist":[false,false,false]},{"userId":"9a994d48-1cac-49f8-9efc-c32b8730215c","accountHolder":"abc","bankName":"abc","accountNumber":"12543565443","ifsc":"SBIN0432323","status":"Pending","rejectReason":null,"verifiedAt":null,"verificationChecklist":[false,false,false]}],"claims":[],"notifications":[],"audit":[{"seq":1,"at":"2026-11-18T06:13:40.781Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"GENESIS","hash":"7acbe366a413b650710658df79dc84c7167d3a0ffffd34ffa7ee8888a091668d"},{"seq":2,"at":"2026-11-18T06:18:55.074Z","actorId":null,"actor":"system","action":"LOGIN_FAILED","entity":"auth","detail":"niyatirpatel99@gmail.com","ip":"::1","prev":"7acbe366a413b650710658df79dc84c7167d3a0ffffd34ffa7ee8888a091668d","hash":"d5c87bd7c0072139498db9f5d4f96a08ab307742fcab72d0c9ff5def2e53f393"},{"seq":3,"at":"2026-11-18T06:19:25.191Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"d5c87bd7c0072139498db9f5d4f96a08ab307742fcab72d0c9ff5def2e53f393","hash":"98bcc6297542398b8738a93299196a1f4082d22db5562cadfbe2ec2d03aa0ca9"},{"seq":4,"at":"2026-11-18T06:24:33.184Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"EMPLOYEE_CREATED","entity":"EMP-0003","detail":"bank Pending","ip":"::1","prev":"98bcc6297542398b8738a93299196a1f4082d22db5562cadfbe2ec2d03aa0ca9","hash":"1a820354aee13e5b32d086fee31bb1f392ba8ca20376f9d5f0270ccb68c52124"},{"seq":5,"at":"2026-11-18T06:25:06.017Z","actorId":"443cc118-ce81-4470-b6f2-d16df3752a7d","actor":"Patel (EMP-0003)","action":"PASSWORD_SET","entity":"auth","detail":"Password set from onboarding link","ip":"::1","prev":"1a820354aee13e5b32d086fee31bb1f392ba8ca20376f9d5f0270ccb68c52124","hash":"52f52f7fbdb6245e42065959d9e443010f4ae5fe25c729909eb97e900420f0f5"},{"seq":6,"at":"2026-11-18T06:25:08.694Z","actorId":"443cc118-ce81-4470-b6f2-d16df3752a7d","actor":"Patel (EMP-0003)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"52f52f7fbdb6245e42065959d9e443010f4ae5fe25c729909eb97e900420f0f5","hash":"6196e866caf2282da6067157b2bf366cd796a7d5400af5d1b50afc7aaee83e2c"},{"seq":7,"at":"2026-11-18T06:25:41.936Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"BANK_APPROVE","entity":"EMP-0003","detail":"","ip":"::1","prev":"6196e866caf2282da6067157b2bf366cd796a7d5400af5d1b50afc7aaee83e2c","hash":"5c6cdd0b10b72195e7e93dfb79f95ef35cb876a661e3708967b0343f1314241a"},{"seq":8,"at":"2026-11-18T06:50:22.039Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"5c6cdd0b10b72195e7e93dfb79f95ef35cb876a661e3708967b0343f1314241a","hash":"0a8ba56cefd1b9a1d1b0d06e69be5bf889b7480e15b952250168e7f7d4cdcd27"},{"seq":9,"at":"2026-11-18T06:51:04.128Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"EMPLOYEE_CREATED","entity":"EMP-0004","detail":"bank Pending","ip":"::1","prev":"0a8ba56cefd1b9a1d1b0d06e69be5bf889b7480e15b952250168e7f7d4cdcd27","hash":"7f74084066a2cdb9b60b79d12e1f445f2a9190bcb8acac018841175ca927d09c"},{"seq":10,"at":"2026-11-18T07:28:23.492Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"EMPLOYEE_CREATED","entity":"EMP-0003","detail":"bank Pending","ip":"::1","prev":"7f74084066a2cdb9b60b79d12e1f445f2a9190bcb8acac018841175ca927d09c","hash":"3f8d3d448d078076b32a0c17d237736a5e9c269140a2eec468433b7985735e09"},{"seq":11,"at":"2026-11-18T07:28:46.767Z","actorId":"9a994d48-1cac-49f8-9efc-c32b8730215c","actor":"niyati (EMP-0003)","action":"PASSWORD_SET","entity":"auth","detail":"Password set from onboarding link","ip":"::1","prev":"3f8d3d448d078076b32a0c17d237736a5e9c269140a2eec468433b7985735e09","hash":"386f22966935818d4302c2fb363e66a5fdd70c9789082f91d096e442c5a4e5a8"},{"seq":12,"at":"2026-11-18T07:29:10.827Z","actorId":"9a994d48-1cac-49f8-9efc-c32b8730215c","actor":"niyati (EMP-0003)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"386f22966935818d4302c2fb363e66a5fdd70c9789082f91d096e442c5a4e5a8","hash":"e68c253f717e9365b14487f8e2f562d8c130dd10eac76f2181bfb2d380dd40bf"}],"budget":{"monthly":200000,"categories":{"PLANE":50000,"TRAIN":20000,"ROAD":15000,"MEALS":40000,"HOTEL":50000,"SUPPLIES":25000}},"seq":{"claim":6,"batch":0}}
+{
+    "users": [
+        {
+            "id": "f605dc94-5c47-4336-a7dc-e888401ebcec",
+            "empCode": "EMP-0001",
+            "status": "active",
+            "mustChange": false,
+            "phone": "",
+            "joiningDate": "2024-01-15",
+            "fullName": "Meera Kapoor",
+            "email": "admin@abcsolutions.com",
+            "passwordHash": "$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6",
+            "role": "admin",
+            "branch": "Corporate HQ"
+        },
+        {
+            "id": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "empCode": "EMP-0002",
+            "status": "active",
+            "mustChange": false,
+            "phone": "",
+            "joiningDate": "2024-01-15",
+            "fullName": "Priya Nair",
+            "email": "hr@abcsolutions.com",
+            "passwordHash": "$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6",
+            "role": "hr",
+            "branch": "Corporate HQ"
+        }
+    ],
+    "bank": [],
+    "claims": [],
+    "notifications": [],
+    "audit": [
+        {
+            "seq": 1,
+            "at": "2026-11-18T06:13:40.781Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "LOGIN",
+            "entity": "auth",
+            "detail": "Signed in",
+            "ip": "::1",
+            "prev": "GENESIS",
+            "hash": "7acbe366a413b650710658df79dc84c7167d3a0ffffd34ffa7ee8888a091668d"
+        },
+        {
+            "seq": 2,
+            "at": "2026-11-18T06:18:55.074Z",
+            "actorId": null,
+            "actor": "system",
+            "action": "LOGIN_FAILED",
+            "entity": "auth",
+            "detail": "niyatirpatel99@gmail.com",
+            "ip": "::1",
+            "prev": "7acbe366a413b650710658df79dc84c7167d3a0ffffd34ffa7ee8888a091668d",
+            "hash": "d5c87bd7c0072139498db9f5d4f96a08ab307742fcab72d0c9ff5def2e53f393"
+        },
+        {
+            "seq": 3,
+            "at": "2026-11-18T06:19:25.191Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "LOGIN",
+            "entity": "auth",
+            "detail": "Signed in",
+            "ip": "::1",
+            "prev": "d5c87bd7c0072139498db9f5d4f96a08ab307742fcab72d0c9ff5def2e53f393",
+            "hash": "98bcc6297542398b8738a93299196a1f4082d22db5562cadfbe2ec2d03aa0ca9"
+        },
+        {
+            "seq": 4,
+            "at": "2026-11-18T06:24:33.184Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "EMPLOYEE_CREATED",
+            "entity": "EMP-0003",
+            "detail": "bank Pending",
+            "ip": "::1",
+            "prev": "98bcc6297542398b8738a93299196a1f4082d22db5562cadfbe2ec2d03aa0ca9",
+            "hash": "1a820354aee13e5b32d086fee31bb1f392ba8ca20376f9d5f0270ccb68c52124"
+        },
+        {
+            "seq": 5,
+            "at": "2026-11-18T06:25:06.017Z",
+            "actorId": "443cc118-ce81-4470-b6f2-d16df3752a7d",
+            "actor": "Patel (EMP-0003)",
+            "action": "PASSWORD_SET",
+            "entity": "auth",
+            "detail": "Password set from onboarding link",
+            "ip": "::1",
+            "prev": "1a820354aee13e5b32d086fee31bb1f392ba8ca20376f9d5f0270ccb68c52124",
+            "hash": "52f52f7fbdb6245e42065959d9e443010f4ae5fe25c729909eb97e900420f0f5"
+        },
+        {
+            "seq": 6,
+            "at": "2026-11-18T06:25:08.694Z",
+            "actorId": "443cc118-ce81-4470-b6f2-d16df3752a7d",
+            "actor": "Patel (EMP-0003)",
+            "action": "LOGIN",
+            "entity": "auth",
+            "detail": "Signed in",
+            "ip": "::1",
+            "prev": "52f52f7fbdb6245e42065959d9e443010f4ae5fe25c729909eb97e900420f0f5",
+            "hash": "6196e866caf2282da6067157b2bf366cd796a7d5400af5d1b50afc7aaee83e2c"
+        },
+        {
+            "seq": 7,
+            "at": "2026-11-18T06:25:41.936Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "BANK_APPROVE",
+            "entity": "EMP-0003",
+            "detail": "",
+            "ip": "::1",
+            "prev": "6196e866caf2282da6067157b2bf366cd796a7d5400af5d1b50afc7aaee83e2c",
+            "hash": "5c6cdd0b10b72195e7e93dfb79f95ef35cb876a661e3708967b0343f1314241a"
+        },
+        {
+            "seq": 8,
+            "at": "2026-11-18T06:50:22.039Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "LOGIN",
+            "entity": "auth",
+            "detail": "Signed in",
+            "ip": "::1",
+            "prev": "5c6cdd0b10b72195e7e93dfb79f95ef35cb876a661e3708967b0343f1314241a",
+            "hash": "0a8ba56cefd1b9a1d1b0d06e69be5bf889b7480e15b952250168e7f7d4cdcd27"
+        },
+        {
+            "seq": 9,
+            "at": "2026-11-18T06:51:04.128Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "EMPLOYEE_CREATED",
+            "entity": "EMP-0004",
+            "detail": "bank Pending",
+            "ip": "::1",
+            "prev": "0a8ba56cefd1b9a1d1b0d06e69be5bf889b7480e15b952250168e7f7d4cdcd27",
+            "hash": "7f74084066a2cdb9b60b79d12e1f445f2a9190bcb8acac018841175ca927d09c"
+        },
+        {
+            "seq": 10,
+            "at": "2026-11-18T07:28:23.492Z",
+            "actorId": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "actor": "Priya Nair (EMP-0002)",
+            "action": "EMPLOYEE_CREATED",
+            "entity": "EMP-0003",
+            "detail": "bank Pending",
+            "ip": "::1",
+            "prev": "7f74084066a2cdb9b60b79d12e1f445f2a9190bcb8acac018841175ca927d09c",
+            "hash": "3f8d3d448d078076b32a0c17d237736a5e9c269140a2eec468433b7985735e09"
+        },
+        {
+            "seq": 11,
+            "at": "2026-11-18T07:28:46.767Z",
+            "actorId": "9a994d48-1cac-49f8-9efc-c32b8730215c",
+            "actor": "niyati (EMP-0003)",
+            "action": "PASSWORD_SET",
+            "entity": "auth",
+            "detail": "Password set from onboarding link",
+            "ip": "::1",
+            "prev": "3f8d3d448d078076b32a0c17d237736a5e9c269140a2eec468433b7985735e09",
+            "hash": "386f22966935818d4302c2fb363e66a5fdd70c9789082f91d096e442c5a4e5a8"
+        },
+        {
+            "seq": 12,
+            "at": "2026-11-18T07:29:10.827Z",
+            "actorId": "9a994d48-1cac-49f8-9efc-c32b8730215c",
+            "actor": "niyati (EMP-0003)",
+            "action": "LOGIN",
+            "entity": "auth",
+            "detail": "Signed in",
+            "ip": "::1",
+            "prev": "386f22966935818d4302c2fb363e66a5fdd70c9789082f91d096e442c5a4e5a8",
+            "hash": "e68c253f717e9365b14487f8e2f562d8c130dd10eac76f2181bfb2d380dd40bf"
+        }
+    ],
+    "budget": {
+        "monthly": 200000,
+        "categories": {
+            "PLANE": 50000,
+            "TRAIN": 20000,
+            "ROAD": 15000,
+            "MEALS": 40000,
+            "HOTEL": 50000,
+            "SUPPLIES": 25000
+        }
+    },
+    "seq": {
+        "claim": 6,
+        "batch": 0
+    }
+}
