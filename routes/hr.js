@@ -59,6 +59,32 @@ router.get('/finance', (req, res) => {
   res.json(list);
 });
 
+router.put('/finance/:id', (req, res) => {
+  const user = db.users.find((u) => u.id === req.params.id && u.role === 'finance');
+  if (!user) return res.status(404).json({ message: 'Finance employee not found' });
+
+  const b = req.body || {};
+  const fullName = typeof b.fullName === 'string' ? b.fullName.trim() : '';
+  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : '';
+  const phone = typeof b.phone === 'string' ? b.phone.trim() : '';
+  const branch = typeof b.branch === 'string' ? b.branch.trim() : '';
+
+  if (!fullName) return res.status(400).json({ message: 'Full name is required' });
+  if (!EMAIL.test(email)) return res.status(400).json({ message: 'Official email is invalid' });
+  if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === email)) {
+    return res.status(400).json({ message: 'A user with this email already exists' });
+  }
+  if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+  if (!BRANCHES.includes(branch)) return res.status(400).json({ message: 'Unknown branch' });
+
+  user.fullName = fullName;
+  user.email = email;
+  user.phone = phone;
+  user.branch = branch;
+  audit(req.user, 'FINANCE_USER_UPDATED', user.empCode, 'Finance staff details updated', req.ip);
+  res.json(withBank(user));
+});
+
 // Create finance employee (only name, email, phone, branch, employee code)
 router.post('/finance', async (req, res) => {
   const b = req.body || {};
