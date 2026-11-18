@@ -2,16 +2,18 @@ const router = require('express').Router();
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
-const { db, CATEGORIES, nextTicket, audit, notifyRole, notify } = require('../store');
+const { db, CATEGORIES, POLICY, nextTicket, audit, notifyRole, notify } = require('../store');
 const { auth, role } = require('../middleware/auth');
 const { receiptUpload, sha256File, removeFiles, ROOT } = require('../middleware/uploadMiddleware');
-const { view, normalizeLock } = require('../claimUtil');
+const { view, duplicateIndicators } = require('../claimUtil');
 
 const PROVIDERS = ['Ola', 'Uber', 'Rapido'];
 const mine = (req) => db.claims.filter((c) => c.employeeId === req.user.id);
 
 // Claim submission is for the Employee role only.
 router.use(auth, role('employee'));
+
+router.get('/policy', (req, res) => res.json({ mileagePerKm: POLICY.mileagePerKm, gstRate: POLICY.gstRate }));
 
 router.get('/', (req, res) => {
   res.json(mine(req).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((c) => view(c, { withEmployee: false })));
@@ -36,6 +38,7 @@ function validateLines(lines) {
     if (l.category === 'ROAD') {
       if (!PROVIDERS.includes(l.provider)) errors.push(`${n}: road travel must be Ola, Uber or Rapido`);
       if (!l.bookingId || !String(l.bookingId).trim()) errors.push(`${n}: ride Booking ID is required`);
+      if (!Number.isFinite(Number(l.distanceKm)) || Number(l.distanceKm) <= 0) errors.push(`${n}: distance in kilometres is required`);
     }
     if (!l.receipt) errors.push(`${n}: a receipt (PDF/JPG/PNG < 200 KB) is mandatory`);
   });
@@ -57,23 +60,15 @@ function save(req, res, existing) {
     else if (l.id && old.get(l.id) && old.get(l.id).receipt) receipt = old.get(l.id).receipt;
     return {
       id: l.id && old.has(l.id) ? l.id : crypto.randomUUID(), date: l.date, category: l.category, amount: Number(l.amount) || 0,
-      reason: l.reason || '', provider: l.category === 'ROAD' ? l.provider || null : null, bookingId: l.category === 'ROAD' ? l.bookingId || null : null, receipt,
+      reason: l.reason || '', provider: l.category === 'ROAD' ? l.provider || null : null,
+      bookingId: l.category === 'ROAD' ? l.bookingId || null : null,
+      distanceKm: l.category === 'ROAD' && l.distanceKm ? Number(l.distanceKm) : null, receipt,
     };
   });
   const submit = !!payload.submit;
   if (submit) {
     const errors = validateLines(lines);
     if (errors.length) return bail(400, 'Please fix the highlighted issues', errors);
-    // SHA-256 duplicate receipt detection across all other submitted claims
-    const others = db.claims.filter((c) => c.id !== (existing && existing.id) && c.status !== 'DRAFT');
-    for (const l of lines) {
-      const hit = l.receipt && others.find((c) => c.lines.some((x) => x.receipt && x.receipt.hash === l.receipt.hash));
-      if (hit) return bail(409, `Duplicate receipt detected: this file was already submitted on ${hit.ticketRef}.`);
-    }
-    // Meta duplicate: Employee + Date + Amount + Category
-    lines.forEach((l) => {
-      l.duplicate = others.some((c) => c.employeeId === req.user.id && c.status !== 'REJECTED' && c.lines.some((x) => x.date === l.date && x.amount === l.amount && x.category === l.category));
-    });
   }
   const now = new Date().toISOString();
   const total = lines.reduce((s, l) => s + l.amount, 0);
@@ -88,6 +83,8 @@ function save(req, res, existing) {
     const resub = claim.status === 'INFO_REQUESTED';
     if (!claim.ticketRef) claim.ticketRef = nextTicket();
     claim.status = 'SUBMITTED'; claim.submittedAt = now; claim.lockedBy = null; claim.lockExpires = null;
+    claim.slaEscalatedAt = null;
+    claim.lines = duplicateIndicators(claim);
     claim.history.push({ at: now, status: 'SUBMITTED', by: req.user.fullName, note: resub ? 'Resubmitted after info request' : 'Claim submitted' });
     audit(req.user, resub ? 'CLAIM_RESUBMITTED' : 'CLAIM_SUBMITTED', claim.ticketRef, `₹${total}`, req.ip);
     notifyRole('finance', `${req.user.fullName} ${resub ? 'resubmitted' : 'submitted'} ${claim.ticketRef} (₹${total.toLocaleString('en-IN')}) — new in the Shared Queue`, `/finance/review/${claim.id}`);

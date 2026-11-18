@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, COST_CENTERS, audit, verifyAuditChain } = require('../store');
+const { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, audit, verifyAuditChain } = require('../store');
 const { auth, role } = require('../middleware/auth');
 const { view } = require('../claimUtil');
 
@@ -30,7 +30,7 @@ function analytics() {
   const statusCounts = ['SUBMITTED', 'UNDER_REVIEW', 'INFO_REQUESTED', 'APPROVED', 'PAID', 'REJECTED'].map((s) => ({ name: s, count: db.claims.filter((c) => c.status === s).length }));
   return {
     budget: { monthly: db.budget.monthly, utilized: sum(categories, (c) => c.utilized), pct: db.budget.monthly ? Math.round((sum(categories, (c) => c.utilized) / db.budget.monthly) * 100) : 0 },
-    categories, byBranch: by(BRANCHES, (l) => l.emp && l.emp.branch), byDepartment: by(Object.keys(COST_CENTERS), (l) => l.emp && l.emp.department).filter((d) => d.amount > 0),
+    categories, byBranch: by(BRANCHES, (l) => l.emp && l.emp.branch),
     trend, statusCounts, totals: { reimbursed: sum(paid, (c) => c.total), pipeline: sum(db.claims.filter((c) => ['SUBMITTED', 'UNDER_REVIEW', 'INFO_REQUESTED', 'APPROVED'].includes(c.status)), (c) => c.total), claims: db.claims.filter((c) => c.status !== 'DRAFT').length },
     avgTurnaroundDays: days.length ? +(sum(days, (d) => d) / days.length).toFixed(1) : 0, slaTargetDays: 5,
     slaMet: days.length ? Math.round((days.filter((d) => d <= 5).length / days.length) * 100) : 0,
@@ -56,7 +56,7 @@ router.get('/search', (req, res) => {
   const claims = db.claims.filter((c) => c.status !== 'DRAFT').map((c) => view(c))
     .filter((c) => c.ticketRef.toLowerCase().includes(q) || c.employee.empCode.toLowerCase().includes(q) || c.employee.fullName.toLowerCase().includes(q)).slice(0, 25);
   const employees = db.users.filter((u) => u.empCode.toLowerCase().includes(q) || u.fullName.toLowerCase().includes(q))
-    .map((u) => ({ id: u.id, empCode: u.empCode, fullName: u.fullName, department: u.department, branch: u.branch, status: u.status })).slice(0, 25);
+    .map((u) => ({ id: u.id, empCode: u.empCode, fullName: u.fullName, branch: u.branch, status: u.status })).slice(0, 25);
   res.json({ claims, employees });
 });
 
@@ -71,10 +71,10 @@ router.get('/audit-log', adminOnly, (req, res) => {
 
 router.get('/export.csv', adminOnly, (req, res) => {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Ticket', 'Employee', 'EmpCode', 'Branch', 'Department', 'Category', 'Date', 'Amount_INR', 'Status', 'UTR'].join(',')];
+  const rows = [['Ticket', 'Employee', 'EmpCode', 'Branch', 'Category', 'Date', 'Amount_INR', 'Status', 'UTR'].join(',')];
   db.claims.filter((c) => c.status !== 'DRAFT').forEach((c) => {
     const e = db.users.find((u) => u.id === c.employeeId);
-    c.lines.forEach((l) => rows.push([c.ticketRef, esc(e.fullName), e.empCode, e.branch, e.department, CATEGORY_LABELS[l.category], l.date, l.amount, c.status, c.utr || ''].join(',')));
+    c.lines.forEach((l) => rows.push([c.ticketRef, esc(e.fullName), e.empCode, e.branch, CATEGORY_LABELS[l.category], l.date, l.amount, c.status, c.utr || ''].join(',')));
   });
   audit(req.user, 'REPORT_EXPORTED', 'claims.csv', '', req.ip);
   res.type('text/csv').send(rows.join('\n'));

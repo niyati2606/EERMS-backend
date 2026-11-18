@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const { db, POLICY, audit, notify } = require('../store');
 const { auth, role } = require('../middleware/auth');
-const { view, normalizeLock } = require('../claimUtil');
+const { view, normalizeLock, businessHoursBetween } = require('../claimUtil');
 
 router.use(auth, role('finance'));
 
@@ -13,7 +13,10 @@ router.get('/queue', (req, res) => {
   const q = String(req.query.q || '').trim().toLowerCase();
   let list = db.claims.filter((c) => ['SUBMITTED', 'UNDER_REVIEW'].includes(normalizeLock(c).status));
   list = list.map((c) => view(c));
-  if (q) list = list.filter((c) => c.ticketRef.toLowerCase().includes(q) || c.employee.empCode.toLowerCase().includes(q) || c.employee.fullName.toLowerCase().includes(q));
+  if (q) list = list.filter((c) => String(c.ticketRef || '').toLowerCase().includes(q)
+    || String(c.employee.empCode || '').toLowerCase().includes(q)
+    || String(c.employee.fullName || '').toLowerCase().includes(q)
+    || String(c.employee.id || '').toLowerCase().includes(q));
   list.sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
   res.json(list);
 });
@@ -24,7 +27,7 @@ router.get('/stats', (req, res) => {
   res.json({
     inQueue: queue.filter((c) => c.status === 'SUBMITTED').length,
     myLocked: queue.filter((c) => c.lockedBy === req.user.id).length,
-    aged: queue.filter((c) => c.status === 'SUBMITTED' && Date.now() - new Date(c.submittedAt) > POLICY.queueSlaHours * 3600000).length,
+    aged: queue.filter((c) => c.status === 'SUBMITTED' && !c.lockedBy && businessHoursBetween(c.submittedAt) > POLICY.queueSlaHours).length,
     highValue: queue.filter((c) => c.total > POLICY.highValue).length,
     toPay: all.filter((c) => c.status === 'APPROVED').length,
     paid: all.filter((c) => c.status === 'PAID').length,
@@ -38,7 +41,7 @@ router.get('/claims/:id', (req, res) => {
   res.json(view(c));
 });
 
-// [Assign to Me] — 15-minute lease lock. Node is single-threaded so check+set is atomic;
+// [Assign to Me] — one-hour lease lock. Node is single-threaded so check+set is atomic;
 // with PostgreSQL this maps to: UPDATE ... WHERE (locked_by IS NULL OR lock_expires < now()) RETURNING *.
 router.post('/claims/:id/assign', (req, res) => {
   const c = find(req.params.id);
@@ -64,10 +67,16 @@ router.post('/claims/:id/assign', (req, res) => {
 router.post('/claims/:id/release', (req, res) => {
   const c = find(req.params.id);
   if (!c) return res.status(404).json({ message: 'Claim not found' });
-  if (c.lockedBy !== req.user.id) return res.status(403).json({ message: 'You do not hold the lock' });
+  if (!lockValid(c, req.user.id)) return res.status(403).json({ message: 'You do not hold an active lock' });
+  const note = String(req.body?.note || '').trim();
+  if (!note) return res.status(400).json({ message: 'A handoff remark is required to release this claim' });
+  if (note.length > 500) return res.status(400).json({ message: 'Handoff remark must be 500 characters or fewer' });
+  const now = new Date().toISOString();
   c.lockedBy = null; c.lockExpires = null;
   if (c.status === 'UNDER_REVIEW') c.status = 'SUBMITTED';
-  audit(req.user, 'CLAIM_RELEASED', c.ticketRef, '', req.ip);
+  c.slaEscalatedAt = null;
+  c.history.push({ at: now, status: c.status, by: req.user.fullName, note: `Released for handoff: ${note}` });
+  audit(req.user, 'CLAIM_RELEASED', c.ticketRef, note, req.ip);
   res.json(view(c));
 });
 
@@ -76,7 +85,7 @@ router.post('/claims/:id/decision', (req, res) => {
   const c = find(req.params.id);
   if (!c) return res.status(404).json({ message: 'Claim not found' });
   if (c.employeeId === req.user.id) return res.status(403).json({ message: 'You cannot approve your own claim' });
-  if (!lockValid(c, req.user.id)) return res.status(409).json({ message: 'Your 15-minute lock has expired or is not held. Click [Assign to Me] again.' });
+  if (!lockValid(c, req.user.id)) return res.status(409).json({ message: 'Your one-hour lock has expired or is not held. Click [Assign to Me] again.' });
   const { decision, note } = req.body || {};
   if (!['approve', 'info', 'reject'].includes(decision)) return res.status(400).json({ message: 'Invalid decision' });
   if (decision !== 'approve' && !(note && note.trim())) return res.status(400).json({ message: 'A written note is mandatory for Request Info / Reject' });

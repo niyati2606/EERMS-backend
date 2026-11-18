@@ -3,10 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { db } = require('./store');
+const { db, POLICY, notify } = require('./store');
 const { auth } = require('./middleware/auth');
 const { uploadErrors } = require('./middleware/uploadMiddleware');
 const claims = require('./routes/claims');
+const { businessHoursBetween, normalizeLock } = require('./claimUtil');
 
 const app = express();
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -29,6 +30,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb' }));
 app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/auth/request-password-reset', rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false }));
 
 app.get('/', (req, res) => res.json({ ok: true, service: 'EERMS API', status: 'running' }));
 app.get('/api/health', (req, res) => res.json({ ok: true, store: 'json-file' }));
@@ -57,5 +59,29 @@ app.use((err, req, res, next) => { // eslint-disable-line
 });
 
 const PORT = process.env.PORT || 5000;
-if (require.main === module) app.listen(PORT, () => console.log(`EERMS API on http://localhost:${PORT} (data persisted to data/store.json)`));
+
+function escalateAgedClaims() {
+  const now = Date.now();
+  const recipients = db.users.filter((user) => user.role === 'finance' && user.status === 'active');
+  if (!recipients.length) return;
+  const aged = db.claims.filter((claim) => {
+    normalizeLock(claim);
+    return claim.status === 'SUBMITTED' && !claim.lockedBy && !claim.slaEscalatedAt
+      && businessHoursBetween(claim.submittedAt, now) > POLICY.queueSlaHours;
+  });
+  if (!aged.length) return;
+  const refs = aged.map((claim) => claim.ticketRef).filter(Boolean);
+  const shown = refs.slice(0, 5).join(', ');
+  const extra = refs.length > 5 ? `, and ${refs.length - 5} more` : '';
+  const message = `SLA escalation digest: ${aged.length} unassigned claim(s) exceeded ${POLICY.queueSlaHours} business hours (${shown}${extra}).`;
+  const at = new Date(now).toISOString();
+  aged.forEach((claim) => { claim.slaEscalatedAt = at; });
+  recipients.forEach((user) => notify(user.id, message, '/finance/dashboard'));
+}
+
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`EERMS API on http://localhost:${PORT} (data persisted to data/store.json)`));
+  escalateAgedClaims();
+  setInterval(escalateAgedClaims, 60_000).unref();
+}
 module.exports = app;

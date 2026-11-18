@@ -9,16 +9,12 @@ CREATE TABLE IF NOT EXISTS employees (
   emp_code VARCHAR(10) UNIQUE NOT NULL DEFAULT ('EMP-' || lpad(nextval('employee_code_seq')::text, 4, '0')),
   full_name VARCHAR(150) NOT NULL,
   email VARCHAR(150) UNIQUE NOT NULL,
-  password_hash VARCHAR(100) NOT NULL,
+  password_hash VARCHAR(100),
   role VARCHAR(20) NOT NULL CHECK (role IN ('employee','finance','hr','admin')),
   phone VARCHAR(20),
-  designation VARCHAR(100),
-  joining_date DATE,
-  department VARCHAR(100),
-  cost_center VARCHAR(100),
   branch_location VARCHAR(50) CHECK (branch_location IN ('Corporate HQ','Branch A','Branch B')),
-  reporting_manager VARCHAR(150),
-  status VARCHAR(10) NOT NULL DEFAULT 'active' CHECK (status IN ('active','frozen')),
+  joining_date DATE,
+  status VARCHAR(10) NOT NULL DEFAULT 'active' CHECK (status IN ('active','pending','frozen')),
   must_change_password BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -29,14 +25,27 @@ CREATE TABLE IF NOT EXISTS bank_details (
   bank_name VARCHAR(100) NOT NULL,
   account_number VARCHAR(18) NOT NULL CHECK (account_number ~ '^[0-9]{9,18}$'),
   ifsc_code VARCHAR(11) NOT NULL CHECK (ifsc_code ~ '^[A-Z]{4}0[A-Z0-9]{6}$'),
-  cheque_file_name VARCHAR(255),
-  cheque_file_path VARCHAR(500),
-  cheque_file_size INTEGER,
-  cts_audit_checks JSONB DEFAULT '[false,false,false,false,false,false,false]',
   bank_verification_status VARCHAR(10) NOT NULL DEFAULT 'Pending' CHECK (bank_verification_status IN ('Pending','Verified','Rejected')),
+  verification_checklist JSONB NOT NULL DEFAULT '[false,false,false]'::jsonb
+    CHECK (jsonb_typeof(verification_checklist) = 'array' AND jsonb_array_length(verification_checklist) = 3),
   reject_reason TEXT,
   verified_at TIMESTAMPTZ
 );
+
+ALTER TABLE employees ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_status_check;
+ALTER TABLE employees ADD CONSTRAINT employees_status_check CHECK (status IN ('active','pending','frozen'));
+ALTER TABLE employees DROP COLUMN IF EXISTS designation;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS joining_date DATE;
+ALTER TABLE employees DROP COLUMN IF EXISTS department;
+ALTER TABLE employees DROP COLUMN IF EXISTS cost_center;
+ALTER TABLE employees DROP COLUMN IF EXISTS reporting_manager;
+
+ALTER TABLE bank_details DROP COLUMN IF EXISTS cheque_file_name;
+ALTER TABLE bank_details DROP COLUMN IF EXISTS cheque_file_path;
+ALTER TABLE bank_details DROP COLUMN IF EXISTS cheque_file_size;
+ALTER TABLE bank_details DROP COLUMN IF EXISTS cts_audit_checks;
+ALTER TABLE bank_details ADD COLUMN IF NOT EXISTS verification_checklist JSONB NOT NULL DEFAULT '[false,false,false]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS claims (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -48,12 +57,13 @@ CREATE TABLE IF NOT EXISTS claims (
   total NUMERIC(12,2) NOT NULL DEFAULT 0,
   submitted_at TIMESTAMPTZ, approved_at TIMESTAMPTZ, paid_at TIMESTAMPTZ,
   locked_by UUID REFERENCES employees(id),
-  lock_expires TIMESTAMPTZ,
+  lock_expires TIMESTAMPTZ, sla_escalated_at TIMESTAMPTZ,
   decision_note TEXT, utr VARCHAR(22), batch_id VARCHAR(30),
   created_at TIMESTAMPTZ DEFAULT now(),
   CHECK (locked_by IS DISTINCT FROM employee_id)  -- no self-audit (BRULE-05)
 );
 CREATE INDEX IF NOT EXISTS idx_claims_queue ON claims (status, submitted_at);
+ALTER TABLE claims ADD COLUMN IF NOT EXISTS sla_escalated_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS claim_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,10 +76,14 @@ CREATE TABLE IF NOT EXISTS claim_lines (
   booking_id VARCHAR(50),
   receipt_name VARCHAR(255), receipt_path VARCHAR(500), receipt_size INTEGER,
   receipt_sha256 CHAR(64),
+  distance_km NUMERIC(8,2),
   possible_duplicate BOOLEAN DEFAULT FALSE,
+  receipt_duplicate BOOLEAN DEFAULT FALSE,
   CHECK (category <> 'ROAD' OR (ride_provider IS NOT NULL AND booking_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS idx_line_hash ON claim_lines (receipt_sha256);
+ALTER TABLE claim_lines ADD COLUMN IF NOT EXISTS distance_km NUMERIC(8,2);
+ALTER TABLE claim_lines ADD COLUMN IF NOT EXISTS receipt_duplicate BOOLEAN DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS claim_history (
   id BIGSERIAL PRIMARY KEY, claim_id UUID REFERENCES claims(id) ON DELETE CASCADE,

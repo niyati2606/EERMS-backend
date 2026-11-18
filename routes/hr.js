@@ -1,23 +1,27 @@
 const router = require('express').Router();
-const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
-const { db, COST_CENTERS, BRANCHES, addUser, addBank, nextEmpCode, audit, hash, publicUser } = require('../store');
+const { db, BRANCHES, addUser, addBank, nextEmpCode, audit, notify, publicUser } = require('../store');
 const { auth, role } = require('../middleware/auth');
 const { view } = require('../claimUtil');
-const { chequeUpload, removeFiles, ROOT, CHEQUE_MAX } = require('../middleware/uploadMiddleware');
 const { sendEmail } = require('../mailer');
 
 router.use(auth, role('hr'));
 
-const DEPARTMENTS = Object.keys(COST_CENTERS);
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const isValidBankChecklist = (value) => Array.isArray(value) && value.length === 3 && [0, 1, 2].every((index) => typeof value[index] === 'boolean');
+const SETUP_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 const withBank = (u) => ({ ...publicUser(u), bank: db.bank.find((b) => b.userId === u.id) || null });
+const isValidDate = (value) => {
+  if (typeof value !== 'string' || !DATE_ONLY.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
 
 router.get('/next-employee-code', (req, res) => res.json({ code: nextEmpCode() }));
-router.get('/meta', (req, res) => res.json({ departments: DEPARTMENTS, costCenters: COST_CENTERS, branches: BRANCHES }));
+router.get('/meta', (req, res) => res.json({ branches: BRANCHES }));
 
 router.get('/stats', (req, res) => {
   const employees = db.users.filter((u) => u.role === 'employee');
@@ -68,7 +72,7 @@ router.post('/finance', async (req, res) => {
 
   const setupToken = crypto.randomBytes(32).toString('hex');
   const setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
-  const setupTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  const setupTokenExpiresAt = Date.now() + SETUP_TOKEN_TTL_MS;
   const origin = req.headers.origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
   const setupUrl = `${origin}/set-password?token=${setupToken}`;
 
@@ -77,7 +81,7 @@ router.post('/finance', async (req, res) => {
     await sendEmail(
       b.email.trim().toLowerCase(),
       'Set up your EERMS Finance account',
-      `Welcome to EERMS, ${b.fullName.trim()}.\nYour Finance account is ready. Set your password using this one-time link within 24 hours:\n${setupUrl}`
+      `Welcome to EERMS, ${b.fullName.trim()}.\nYour Finance account is ready. Set your password using this one-time link within 30 minutes:\n${setupUrl}`
     );
     emailSent = true;
   } catch (error) {
@@ -93,11 +97,6 @@ router.post('/finance', async (req, res) => {
     passwordHash: null,
     role: 'finance',
     status: 'pending',
-    designation: 'Finance Officer',
-    department: 'Finance',
-    costCenter: 'Finance - Accounts',
-    joiningDate: new Date().toISOString().split('T')[0],
-    reportingManager: '',
     mustChange: false,
     setupTokenHash,
     setupTokenExpiresAt,
@@ -118,7 +117,7 @@ router.post('/employees/:id/resend-setup', async (req, res) => {
 
   const setupToken = crypto.randomBytes(32).toString('hex');
   u.setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
-  u.setupTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  u.setupTokenExpiresAt = Date.now() + SETUP_TOKEN_TTL_MS;
 
   const origin = req.headers.origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
   const setupUrl = `${origin}/set-password?token=${setupToken}`;
@@ -128,7 +127,7 @@ router.post('/employees/:id/resend-setup', async (req, res) => {
     await sendEmail(
       u.email,
       'Set up your EERMS password',
-      `Hello ${u.fullName},\n\nHere is your new password setup link for EERMS. It is valid for 24 hours:\n${setupUrl}`
+      `Hello ${u.fullName},\n\nHere is your new password setup link for EERMS. It is valid for 30 minutes:\n${setupUrl}`
     );
     emailSent = true;
     audit(req.user, 'SETUP_EMAIL_RESENT', u.empCode, `Sent to ${u.email}`, req.ip);
@@ -143,28 +142,28 @@ router.post('/employees/:id/resend-setup', async (req, res) => {
   });
 });
 
-// Create employee — bank verification can be completed after the employee uploads a cheque.
-router.post('/employees', chequeUpload.single('chequeFile'), async (req, res) => {
+// Create employee — bank details remain pending until HR verifies them.
+router.post('/employees', async (req, res) => {
   const b = req.body || {};
-  const bail = (code, message, errors) => { removeFiles(req.file ? [req.file] : []); return res.status(code).json({ message, errors }); };
   const errors = [];
   const req_ = (k, label) => { if (!b[k] || !String(b[k]).trim()) errors.push(`${label} is required`); };
-  [['fullName', 'Full name'], ['email', 'Official email'], ['phoneNumber', 'Phone'], ['joiningDate', 'Date of joining'],
-    ['branchLocation', 'Branch location'], ['accountHolderName', 'Account holder name'],
+  [['fullName', 'Full name'], ['email', 'Official email'], ['phoneNumber', 'Phone'],
+    ['branchLocation', 'Branch location'], ['joiningDate', 'Joining date'], ['accountHolderName', 'Account holder name'],
     ['bankName', 'Bank name'], ['accountNumber', 'Account number'], ['ifscCode', 'IFSC code']].forEach(([k, l]) => req_(k, l));
+  if (b.joiningDate && !isValidDate(b.joiningDate)) errors.push('Joining date is invalid');
   if (b.email && !EMAIL.test(b.email)) errors.push('Official email is invalid');
   if (b.email && db.users.some((u) => u.email.toLowerCase() === b.email.toLowerCase())) errors.push('An employee with this email already exists');
   if (b.branchLocation && !BRANCHES.includes(b.branchLocation)) errors.push('Unknown branch');
   if (b.accountNumber && !/^\d{9,18}$/.test(b.accountNumber)) errors.push('Account number must be 9–18 digits');
   if (b.ifscCode && !IFSC.test(String(b.ifscCode).toUpperCase())) errors.push('IFSC code is invalid');
-  if (errors.length) return bail(400, errors[0], errors);
+  if (errors.length) return res.status(400).json({ message: errors[0], errors });
 
   const setupToken = crypto.randomBytes(32).toString('hex');
   const setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
-  const setupTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  const setupTokenExpiresAt = Date.now() + SETUP_TOKEN_TTL_MS;
   const setupUrl = `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/set-password?token=${setupToken}`;
   try {
-    await sendEmail(b.email.trim().toLowerCase(), 'Set up your EERMS account', `Welcome to EERMS, ${b.fullName.trim()}.\nYour account is ready. Set your password using this one-time link within 24 hours:\n${setupUrl}`);
+    await sendEmail(b.email.trim().toLowerCase(), 'Set up your EERMS account', `Welcome to EERMS, ${b.fullName.trim()}.\nYour account is ready. Set your password using this one-time link within 30 minutes:\n${setupUrl}`);
   } catch (error) {
     console.error('Failed to send employee password setup email:', error.message);
     const message = error.code === 'EAUTH'
@@ -174,18 +173,16 @@ router.post('/employees', chequeUpload.single('chequeFile'), async (req, res) =>
         : error.code === 'SMTP_CONFIG'
           ? error.message
           : 'Could not send the password setup email. Check SMTP settings in eerms-backend/.env and try again.';
-    return bail(502, message);
+    return res.status(502).json({ message });
   }
 
   const user = addUser({
-    fullName: b.fullName.trim(), email: b.email.trim().toLowerCase(), passwordHash: null, role: 'employee', status: 'pending', phone: b.phoneNumber, designation: '',
-    joiningDate: b.joiningDate, department: '', costCenter: '', branch: b.branchLocation,
-    reportingManager: '', mustChange: false, setupTokenHash, setupTokenExpiresAt,
+    fullName: b.fullName.trim(), email: b.email.trim().toLowerCase(), passwordHash: null, role: 'employee', status: 'pending', phone: b.phoneNumber, branch: b.branchLocation,
+    joiningDate: b.joiningDate, mustChange: false, setupTokenHash, setupTokenExpiresAt,
   });
   const bank = addBank(user.id, {
     accountHolder: b.accountHolderName.trim(), bankName: b.bankName.trim(), accountNumber: b.accountNumber, ifsc: String(b.ifscCode).toUpperCase(),
-    chequeFileName: req.file ? req.file.originalname : null, chequeFilePath: req.file ? req.file.filename : null, chequeFileSize: req.file ? req.file.size : null,
-    ctsAuditChecks: Array(3).fill(false), status: 'Pending', verifiedAt: null,
+    status: 'Pending', verifiedAt: null,
   });
   audit(req.user, 'EMPLOYEE_CREATED', user.empCode, `bank ${bank.status}`, req.ip);
   res.status(201).json({ employee: withBank(user), bankStatus: bank.status, emailDelivery: 'sent' });
@@ -195,25 +192,50 @@ router.put('/employees/:id', (req, res) => {
   const u = db.users.find((x) => x.id === req.params.id);
   if (!u) return res.status(404).json({ message: 'Employee not found' });
   const b = req.body || {};
-  if (b.department && !DEPARTMENTS.includes(b.department)) return res.status(400).json({ message: 'Unknown department' });
   if (b.branch && !BRANCHES.includes(b.branch)) return res.status(400).json({ message: 'Unknown branch' });
-  const before = `${u.branch}/${u.department}`;
-  ['fullName', 'phone', 'designation', 'department', 'costCenter', 'branch', 'reportingManager'].forEach((k) => { if (b[k] !== undefined) u[k] = b[k]; });
-  audit(req.user, 'EMPLOYEE_UPDATED', u.empCode, `${before} → ${u.branch}/${u.department}`, req.ip);
+  if (b.joiningDate !== undefined && b.joiningDate !== '' && !isValidDate(b.joiningDate)) return res.status(400).json({ message: 'Joining date is invalid' });
+  const beforeBranch = u.branch;
+  ['fullName', 'phone', 'branch'].forEach((k) => { if (b[k] !== undefined) u[k] = b[k]; });
+  if (b.joiningDate !== undefined) u.joiningDate = b.joiningDate || null;
+  audit(req.user, 'EMPLOYEE_UPDATED', u.empCode, `${beforeBranch} → ${u.branch}`, req.ip);
   res.json(withBank(u));
 });
 
-// Bank detail change → re-verification required
-router.put('/employees/:id/bank', chequeUpload.single('chequeFile'), (req, res) => {
-  const u = db.users.find((x) => x.id === req.params.id);
+router.put('/employees/:id/bank', (req, res) => {
+  const u = db.users.find((x) => x.id === req.params.id && x.role === 'employee');
+  if (!u) return res.status(404).json({ message: 'Employee not found' });
+  const bank = db.bank.find((x) => x.userId === u.id);
+  if (!bank) return res.status(404).json({ message: 'Bank record not found' });
+
   const b = req.body || {};
-  if (!u) { removeFiles(req.file ? [req.file] : []); return res.status(404).json({ message: 'Employee not found' }); }
-  if (!/^\d{9,18}$/.test(b.accountNumber || '') || !IFSC.test(String(b.ifscCode || '').toUpperCase()) || !b.bankName || !b.accountHolderName || !req.file) {
-    removeFiles(req.file ? [req.file] : []);
-    return res.status(400).json({ message: 'Account holder, bank, 9–18 digit account, valid IFSC and a cheque file are required' });
+  const required = [
+    ['accountHolder', 'Account holder name'],
+    ['bankName', 'Bank name'],
+    ['accountNumber', 'Account number'],
+    ['ifsc', 'IFSC code'],
+  ];
+  for (const [field, label] of required) {
+    if (typeof b[field] !== 'string' || !b[field].trim()) {
+      return res.status(400).json({ message: `${label} is required` });
+    }
   }
-  addBank(u.id, { accountHolder: b.accountHolderName, bankName: b.bankName, accountNumber: b.accountNumber, ifsc: b.ifscCode.toUpperCase(), chequeFileName: req.file.originalname, chequeFilePath: req.file.filename, chequeFileSize: req.file.size, status: 'Pending' });
-  audit(req.user, 'BANK_UPDATED', u.empCode, 'Re-verification required', req.ip);
+
+  const accountNumber = b.accountNumber.trim();
+  const ifsc = b.ifsc.trim().toUpperCase();
+  if (!/^\d{9,18}$/.test(accountNumber)) {
+    return res.status(400).json({ message: 'Account number must be 9–18 digits' });
+  }
+  if (!IFSC.test(ifsc)) return res.status(400).json({ message: 'IFSC code is invalid' });
+
+  bank.accountHolder = b.accountHolder.trim();
+  bank.bankName = b.bankName.trim();
+  bank.accountNumber = accountNumber;
+  bank.ifsc = ifsc;
+  bank.status = 'Pending';
+  bank.rejectReason = null;
+  bank.verifiedAt = null;
+  bank.verificationChecklist = [false, false, false];
+  audit(req.user, 'BANK_DETAILS_UPDATED', u.empCode, 'Bank details updated; verification reset to pending', req.ip);
   res.json(withBank(u));
 });
 
@@ -236,39 +258,36 @@ router.get('/bank-verifications', (req, res) => {
   const st = req.query.status;
   res.json(db.bank.filter((b) => !st || b.status === st).map((b) => {
     const u = db.users.find((x) => x.id === b.userId);
-    const checks = Array.isArray(b.ctsAuditChecks) ? b.ctsAuditChecks : [];
-    return { ...b, ctsAuditChecks: checks.length === 7 ? [checks[3], checks[4], checks[5]] : checks.slice(0, 3), chequeFilePath: undefined, employee: u ? { id: u.id, empCode: u.empCode, fullName: u.fullName, department: u.department, branch: u.branch } : null };
+    return {
+      userId: b.userId, accountHolder: b.accountHolder, bankName: b.bankName, accountNumber: b.accountNumber, ifsc: b.ifsc,
+      status: b.status, rejectReason: b.rejectReason, verifiedAt: b.verifiedAt, verificationChecklist: b.verificationChecklist,
+      employee: u ? { id: u.id, empCode: u.empCode, fullName: u.fullName, branch: u.branch } : null,
+    };
   }).sort((a, b) => (a.status === 'Pending' ? -1 : 1)));
-});
-
-router.get('/bank/:userId/cheque', (req, res) => {
-  const b = db.bank.find((x) => x.userId === req.params.userId);
-  if (!b || !b.chequeFilePath) return res.status(404).json({ message: 'No cheque on file' });
-  const filename = path.basename(b.chequeFilePath);
-  const p1 = path.join(ROOT, 'cheques', filename);
-  const p2 = path.join(__dirname, '..', 'uploads', 'cheques', filename);
-  const p = fs.existsSync(p1) ? p1 : (fs.existsSync(p2) ? p2 : null);
-  if (!p) return res.status(404).json({ message: 'File missing' });
-  res.sendFile(p);
 });
 
 router.post('/bank/:userId/decision', (req, res) => {
   const b = db.bank.find((x) => x.userId === req.params.userId);
   const u = db.users.find((x) => x.id === req.params.userId);
   if (!b || !u) return res.status(404).json({ message: 'Bank record not found' });
-  const { decision, checks, reason } = req.body || {};
-  if (Array.isArray(checks) && checks.length === 3) b.ctsAuditChecks = checks.map((x) => x === true);
+  const { decision, reason } = req.body || {};
   if (decision === 'approve') {
-    if (!b.ctsAuditChecks.every(Boolean)) return res.status(400).json({ message: 'Tick all 3 bank detail checklist items before approving' });
+    if (!isValidBankChecklist(req.body?.verificationChecklist) || !req.body.verificationChecklist.every(Boolean)) {
+      return res.status(400).json({ message: 'Complete all bank detail checks before approval' });
+    }
+    b.verificationChecklist = req.body.verificationChecklist;
     b.status = 'Verified'; b.rejectReason = null; b.verifiedAt = new Date().toISOString();
   } else if (decision === 'reject') {
-    if (!reason || !reason.trim()) return res.status(400).json({ message: 'A rejection reason is mandatory' });
+    if (typeof reason !== 'string' || !reason.trim()) return res.status(400).json({ message: 'A rejection reason is mandatory' });
+    if (req.body.verificationChecklist !== undefined && !isValidBankChecklist(req.body.verificationChecklist)) {
+      return res.status(400).json({ message: 'Bank detail checklist is invalid' });
+    }
+    if (req.body.verificationChecklist !== undefined) b.verificationChecklist = req.body.verificationChecklist;
     b.status = 'Rejected'; b.rejectReason = reason.trim();
-    notify(u.id, `Your bank details were rejected: ${b.rejectReason}. Contact HR.`);
-  } else if (decision !== 'save') return res.status(400).json({ message: 'Invalid decision' });
+    notify(u.id, `Your bank details were rejected: ${b.rejectReason}. Contact HR.`, '/employee/profile');
+  } else return res.status(400).json({ message: 'Invalid decision' });
   audit(req.user, 'BANK_' + String(decision).toUpperCase(), u.empCode, reason || '', req.ip);
   res.json(b);
 });
 
-router.CHEQUE_MAX = CHEQUE_MAX;
 module.exports = router;
