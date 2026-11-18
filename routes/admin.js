@@ -1,7 +1,6 @@
 const router = require('express').Router();
 const { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, audit, verifyAuditChain } = require('../store');
 const { auth, role } = require('../middleware/auth');
-const { view } = require('../claimUtil');
 
 router.use(auth, role('admin', 'finance'));
 const adminOnly = role('admin');
@@ -47,17 +46,6 @@ router.put('/budget', adminOnly, (req, res) => {
   if (categories) CATEGORIES.forEach((k) => { if (Number(categories[k]) >= 0) db.budget.categories[k] = Number(categories[k]); });
   audit(req.user, 'BUDGET_SET', 'budget', `₹${monthly}`, req.ip);
   res.json(db.budget);
-});
-
-// Universal search: ticket ref / employee ID (FR-09)
-router.get('/search', (req, res) => {
-  const q = String(req.query.q || '').trim().toLowerCase();
-  if (!q) return res.json({ claims: [], employees: [] });
-  const claims = db.claims.filter((c) => c.status !== 'DRAFT').map((c) => view(c))
-    .filter((c) => c.ticketRef.toLowerCase().includes(q) || c.employee.empCode.toLowerCase().includes(q) || c.employee.fullName.toLowerCase().includes(q)).slice(0, 25);
-  const employees = db.users.filter((u) => u.empCode.toLowerCase().includes(q) || u.fullName.toLowerCase().includes(q))
-    .map((u) => ({ id: u.id, empCode: u.empCode, fullName: u.fullName, branch: u.branch, status: u.status })).slice(0, 25);
-  res.json({ claims, employees });
 });
 
 router.get('/audit-log', adminOnly, (req, res) => {
