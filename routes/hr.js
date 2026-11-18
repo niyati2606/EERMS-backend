@@ -2,7 +2,7 @@ const router = require('express').Router();
 const crypto = require('crypto');
 const { db, BRANCHES, addUser, addBank, nextEmpCode, audit, notify, publicUser } = require('../store');
 const { auth, role } = require('../middleware/auth');
-const { view } = require('../claimUtil');
+const { view, getFrontendUrl } = require('../claimUtil');
 const { sendEmail } = require('../mailer');
 
 router.use(auth, role('hr'));
@@ -73,7 +73,7 @@ router.post('/finance', async (req, res) => {
   const setupToken = crypto.randomBytes(32).toString('hex');
   const setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
   const setupTokenExpiresAt = Date.now() + SETUP_TOKEN_TTL_MS;
-  const origin = req.headers.origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const origin = getFrontendUrl(req);
   const setupUrl = `${origin}/set-password?token=${setupToken}`;
 
   let emailSent = false;
@@ -119,7 +119,7 @@ router.post('/employees/:id/resend-setup', async (req, res) => {
   u.setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
   u.setupTokenExpiresAt = Date.now() + SETUP_TOKEN_TTL_MS;
 
-  const origin = req.headers.origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const origin = getFrontendUrl(req);
   const setupUrl = `${origin}/set-password?token=${setupToken}`;
 
   let emailSent = false;
@@ -161,7 +161,8 @@ router.post('/employees', async (req, res) => {
   const setupToken = crypto.randomBytes(32).toString('hex');
   const setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
   const setupTokenExpiresAt = Date.now() + SETUP_TOKEN_TTL_MS;
-  const setupUrl = `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/set-password?token=${setupToken}`;
+  const origin = getFrontendUrl(req);
+  const setupUrl = `${origin}/set-password?token=${setupToken}`;
   try {
     await sendEmail(b.email.trim().toLowerCase(), 'Set up your EERMS account', `Welcome to EERMS, ${b.fullName.trim()}.\nYour account is ready. Set your password using this one-time link within 30 minutes:\n${setupUrl}`);
   } catch (error) {

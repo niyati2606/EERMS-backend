@@ -113,4 +113,27 @@ function view(c, { withEmployee = true, reveal = false } = {}) {
   return out;
 }
 
-module.exports = { normalizeLock, businessHoursBetween, duplicateIndicators, flags, view };
+function getFrontendUrl(req) {
+  let origin = null;
+  if (req && req.headers) {
+    origin = req.headers.origin;
+    if (!origin && req.headers.referer) {
+      try { origin = new URL(req.headers.referer).origin; } catch (_) {}
+    }
+  }
+  if (origin && origin.includes('.vercel.app')) {
+    return origin.replace(/\/+$/, '');
+  }
+  if (process.env.CLIENT_ORIGIN && !process.env.CLIENT_ORIGIN.includes('localhost')) {
+    return process.env.CLIENT_ORIGIN.replace(/\/+$/, '');
+  }
+  if (origin && !origin.includes('localhost')) {
+    return origin.replace(/\/+$/, '');
+  }
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    return (process.env.CLIENT_ORIGIN || 'https://eerms-frontend.vercel.app').replace(/\/+$/, '');
+  }
+  return (origin || process.env.CLIENT_ORIGIN || 'http://localhost:5173').replace(/\/+$/, '');
+}
+
+module.exports = { normalizeLock, businessHoursBetween, duplicateIndicators, flags, view, getFrontendUrl };

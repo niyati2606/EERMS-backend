@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { db, publicUser, audit, hash } = require('../store');
 const { sign, auth } = require('../middleware/auth');
 const { sendEmail } = require('../mailer');
+const { getFrontendUrl } = require('../claimUtil');
 
 const DASH = { employee: '/employee/dashboard', finance: '/finance/dashboard', hr: '/hr/dashboard', admin: '/admin/dashboard' };
 
@@ -57,7 +58,7 @@ router.post('/request-password-reset', async (req, res) => {
     const token = crypto.randomBytes(32).toString('hex');
     user.passwordResetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
     user.passwordResetTokenExpiresAt = Date.now() + 60 * 60 * 1000;
-    const origin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+    const origin = getFrontendUrl(req);
     const resetUrl = `${origin}/reset-password?token=${token}`;
     try {
       await sendEmail(
