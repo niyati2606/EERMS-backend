@@ -102,7 +102,12 @@ const fs = require('fs');
 const path = require('path');
 const BUNDLED_FILE = path.join(__dirname, 'data', 'store.json');
 const FILE = process.env.DATA_FILE || (process.env.VERCEL ? path.join('/tmp', 'store.json') : BUNDLED_FILE);
-const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.STORAGE_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_PRISMA_URL;
 let pgPool = null;
 let initializationPromise = null;
 
