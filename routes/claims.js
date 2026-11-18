@@ -2,7 +2,7 @@ const router = require('express').Router();
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
-const { db, CATEGORIES, POLICY, nextTicket, audit, notifyRole, notify } = require('../store');
+const { db, CATEGORIES, POLICY, nextTicket, audit, notifyRole, notify, saveReceiptFile, getReceiptFile, hasPersistentStorage } = require('../store');
 const { auth, role } = require('../middleware/auth');
 const { receiptUpload, sha256File, removeFiles, ROOT } = require('../middleware/uploadMiddleware');
 const { view, duplicateIndicators } = require('../claimUtil');
@@ -45,7 +45,7 @@ function validateLines(lines) {
   return errors;
 }
 
-function save(req, res, existing) {
+async function save(req, res, existing) {
   const files = req.files || [];
   const bail = (code, message, errors) => { removeFiles(files); return res.status(code).json({ message, errors }); };
   let payload;
@@ -69,6 +69,23 @@ function save(req, res, existing) {
   if (submit) {
     const errors = validateLines(lines);
     if (errors.length) return bail(400, 'Please fix the highlighted issues', errors);
+  }
+  if (files.length && process.env.VERCEL && !hasPersistentStorage()) {
+    return bail(503, 'Receipt uploads on Vercel require a configured PostgreSQL DATABASE_URL.');
+  }
+  if (hasPersistentStorage()) {
+    try {
+      await Promise.all(files.map((file) => saveReceiptFile(
+        file.filename,
+        fs.readFileSync(file.path),
+        file.mimetype,
+        file.originalname,
+      )));
+    } catch (error) {
+      removeFiles(files);
+      throw error;
+    }
+    if (process.env.VERCEL) removeFiles(files);
   }
   const now = new Date().toISOString();
   const total = lines.reduce((s, l) => s + l.amount, 0);
@@ -94,11 +111,16 @@ function save(req, res, existing) {
   res.status(existing ? 200 : 201).json(view(claim, { withEmployee: false }));
 }
 
-router.post('/', receiptUpload.any(), (req, res) => save(req, res, null));
-router.put('/:id', receiptUpload.any(), (req, res) => {
+router.post('/', receiptUpload.any(), (req, res, next) => {
+  save(req, res, null).catch(next);
+});
+router.put('/:id', receiptUpload.any(), (req, res, next) => {
   const c = mine(req).find((x) => x.id === req.params.id);
-  if (!c) return res.status(404).json({ message: 'Claim not found' });
-  save(req, res, c);
+  if (!c) {
+    removeFiles(req.files || []);
+    return res.status(404).json({ message: 'Claim not found' });
+  }
+  save(req, res, c).catch(next);
 });
 
 router.delete('/:id', (req, res) => {
@@ -109,15 +131,35 @@ router.delete('/:id', (req, res) => {
 });
 
 module.exports = router;
-module.exports.receiptFileHandler = (req, res) => {
+module.exports.receiptFileHandler = async (req, res, next) => {
   const file = path.basename(req.params.file);
   const claim = db.claims.find((c) => c.lines.some((l) => l.receipt && l.receipt.file === file));
   if (!claim) return res.status(404).json({ message: 'Receipt not found' });
   const ok = claim.employeeId === req.user.id || ['finance', 'admin'].includes(req.user.role);
   if (!ok) return res.status(403).json({ message: 'Not allowed' });
+  const receipt = claim.lines.find((line) => line.receipt && line.receipt.file === file).receipt;
+  try {
+    const stored = await getReceiptFile(file);
+    if (stored) {
+      res.type(stored.content_type || receipt.mime || 'application/octet-stream').send(stored.file_data);
+      return;
+    }
+  } catch (error) {
+    return next(error);
+  }
   const p1 = path.join(ROOT, 'receipts', file);
   const p2 = path.join(__dirname, '..', 'uploads', 'receipts', file);
   const p = fs.existsSync(p1) ? p1 : (fs.existsSync(p2) ? p2 : null);
   if (!p) return res.status(404).json({ message: 'File missing' });
+  if (hasPersistentStorage()) {
+    try {
+      const content = fs.readFileSync(p);
+      await saveReceiptFile(file, content, receipt.mime || 'application/octet-stream', receipt.name || file);
+      res.type(receipt.mime || 'application/octet-stream').send(content);
+      return;
+    } catch (error) {
+      return next(error);
+    }
+  }
   res.sendFile(p);
 };
