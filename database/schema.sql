@@ -1,6 +1,14 @@
 -- EERMS PostgreSQL schema (target relational model; mirrors store.js)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Single-document compatibility store used by the serverless Node.js application.
+-- The relational tables above remain the target normalized schema.
+CREATE TABLE IF NOT EXISTS eerms_store (
+  id SMALLINT PRIMARY KEY,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE SEQUENCE IF NOT EXISTS employee_code_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS ticket_seq START 1;
 

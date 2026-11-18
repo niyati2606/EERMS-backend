@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { db, POLICY, notify } = require('./store');
+const { db, POLICY, notify, initializeStore, getPersistenceType } = require('./store');
 const { auth } = require('./middleware/auth');
 const { uploadErrors } = require('./middleware/uploadMiddleware');
 const claims = require('./routes/claims');
@@ -11,6 +11,15 @@ const { businessHoursBetween, normalizeLock } = require('./claimUtil');
 
 const app = express();
 app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(async (req, res, next) => {
+  try {
+    await initializeStore();
+    next();
+  } catch (error) {
+    console.error('Store initialization failed:', error);
+    res.status(503).json({ message: 'Application store unavailable' });
+  }
+});
 
 const allowedOrigin = process.env.CLIENT_ORIGIN;
 app.use(cors({
@@ -33,7 +42,7 @@ app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standa
 app.use('/api/auth/request-password-reset', rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false }));
 
 app.get('/', (req, res) => res.json({ ok: true, service: 'EERMS API', status: 'running' }));
-app.get('/api/health', (req, res) => res.json({ ok: true, store: 'json-file' }));
+app.get('/api/health', (req, res) => res.json({ ok: true, store: getPersistenceType() }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employee', require('./routes/employee'));
 app.use('/api/claims', claims);

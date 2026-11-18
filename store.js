@@ -97,11 +97,51 @@ function seed() {
   addUser({ empCode: 'EMP-0004', fullName: 'Sneha Iyer', email: 'finance2@abcsolutions.com', passwordHash: ph, role: 'finance', branch: 'Corporate HQ' });
   audit(null, 'SEED', 'system', 'Initial role accounts loaded');
 }
-// ---------- Persistence (JSON file) so data survives server restarts ----------
+// ---------- Persistence (PostgreSQL in production, JSON file locally) ----------
 const fs = require('fs');
 const path = require('path');
 const BUNDLED_FILE = path.join(__dirname, 'data', 'store.json');
 const FILE = process.env.DATA_FILE || (process.env.VERCEL ? path.join('/tmp', 'store.json') : BUNDLED_FILE);
+const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+let pgPool = null;
+let initializationPromise = null;
+
+if (DATABASE_URL) {
+  const { Pool } = require('pg');
+  pgPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+  });
+}
+
+async function loadFromPostgres() {
+  if (!pgPool) return false;
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS eerms_store (
+      id SMALLINT PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  const result = await pgPool.query('SELECT data FROM eerms_store WHERE id = 1');
+  if (result.rows.length === 0) return false;
+  const d = result.rows[0].data;
+  ['users', 'bank', 'claims', 'notifications', 'audit'].forEach((k) => { db[k] = d[k] || []; });
+  db.users.forEach((user) => {
+    if (!user.passwordHash) user.status = 'pending';
+    REMOVED_USER_FIELDS.forEach((field) => { delete user[field]; });
+  });
+  db.bank.forEach((bank) => {
+    REMOVED_BANK_FIELDS.forEach((field) => { delete bank[field]; });
+    if (!Array.isArray(bank.verificationChecklist) || bank.verificationChecklist.length !== 3 ||
+      ![0, 1, 2].every((index) => typeof bank.verificationChecklist[index] === 'boolean')) {
+      bank.verificationChecklist = [false, false, false];
+    }
+  });
+  db.budget = d.budget || db.budget;
+  db.seq = d.seq || db.seq;
+  return db.users.length > 0;
+}
 
 function loadFromDisk() {
   try {
@@ -131,19 +171,61 @@ function loadFromDisk() {
   } catch { return false; }
 }
 let lastSaved = '';
-function persist() {
+let pgSaveQueue = Promise.resolve();
+
+async function persist() {
   if (process.env.NODE_ENV === 'test') return;
+  const out = JSON.stringify(db);
+  if (out === lastSaved) return;
+
+  if (pgPool) {
+    pgSaveQueue = pgSaveQueue
+      .then(() => pgPool.query(`
+        INSERT INTO eerms_store (id, data, updated_at)
+        VALUES (1, $1::jsonb, now())
+        ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
+      `, [out]))
+      .then(() => { lastSaved = out; })
+      .catch((e) => {
+        console.error('PostgreSQL persist failed:', e.message);
+      });
+    await pgSaveQueue;
+    return;
+  }
+
   try {
-    const out = JSON.stringify(db);
-    if (out === lastSaved) return;
     fs.mkdirSync(path.dirname(FILE), { recursive: true });
     fs.writeFileSync(FILE + '.tmp', out);
     fs.renameSync(FILE + '.tmp', FILE);
     lastSaved = out;
   } catch (e) { console.error('persist failed', e.message); }
 }
-if (!loadFromDisk()) { seed(); persist(); } else { console.log(`Loaded saved data from ${FILE}`); persist(); }
-setInterval(persist, 2000).unref();
-['SIGINT', 'SIGTERM'].forEach((sig) => process.on(sig, () => { persist(); process.exit(0); }));
 
-module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct };
+async function initializeStore() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      let loaded = false;
+      if (pgPool) {
+        try {
+          loaded = await loadFromPostgres();
+          console.log(loaded ? 'Loaded saved data from PostgreSQL' : 'Initialized PostgreSQL store');
+        } catch (e) {
+          console.error('PostgreSQL load failed; falling back to JSON storage:', e.message);
+          pgPool = null;
+        }
+      }
+      if (!loaded) loaded = loadFromDisk();
+      if (!loaded) seed();
+      await persist();
+      setInterval(() => persist(), 2000).unref();
+      ['SIGINT', 'SIGTERM'].forEach((sig) => process.on(sig, () => { persist().finally(() => process.exit(0)); }));
+    })();
+  }
+  return initializationPromise;
+}
+
+function getPersistenceType() {
+  return pgPool ? 'postgresql' : 'json-file';
+}
+
+module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType };
