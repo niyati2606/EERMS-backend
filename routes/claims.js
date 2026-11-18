@@ -80,6 +80,7 @@ async function save(req, res, existing) {
         fs.readFileSync(file.path),
         file.mimetype,
         file.originalname,
+        req.storeClient,
       )));
     } catch (error) {
       removeFiles(files);

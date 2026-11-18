@@ -126,12 +126,14 @@ if (DATABASE_URL) {
   console.log('PostgreSQL database pool configured.');
 }
 
-let lastLoadedTime = 0;
+let lastLoadedTime = '';
+let lastLoadedRevision = '';
+let lastSaved = '';
 
 // ---------- Receipt file storage in PostgreSQL ----------
-async function ensureReceiptTable() {
-  if (!pgPool) return;
-  await pgPool.query(`
+async function ensureReceiptTable(queryable = pgPool) {
+  if (!queryable) return;
+  await queryable.query(`
     CREATE TABLE IF NOT EXISTS eerms_receipt_files (
       filename TEXT PRIMARY KEY,
       file_data BYTEA NOT NULL,
@@ -142,20 +144,20 @@ async function ensureReceiptTable() {
   `);
 }
 
-async function saveReceiptFile(filename, buffer, contentType, originalName) {
-  if (!pgPool) return;
-  await ensureReceiptTable();
-  await pgPool.query(`
+async function saveReceiptFile(filename, buffer, contentType, originalName, queryable = pgPool) {
+  if (!queryable) return;
+  await ensureReceiptTable(queryable);
+  await queryable.query(`
     INSERT INTO eerms_receipt_files (filename, file_data, content_type, original_name)
     VALUES ($1, $2, $3, $4)
     ON CONFLICT (filename) DO UPDATE SET file_data = EXCLUDED.file_data, content_type = EXCLUDED.content_type
   `, [filename, buffer, contentType, originalName || filename]);
 }
 
-async function getReceiptFile(filename) {
-  if (!pgPool) return null;
-  await ensureReceiptTable();
-  const result = await pgPool.query('SELECT file_data, content_type, original_name FROM eerms_receipt_files WHERE filename = $1', [filename]);
+async function getReceiptFile(filename, queryable = pgPool) {
+  if (!queryable) return null;
+  await ensureReceiptTable(queryable);
+  const result = await queryable.query('SELECT file_data, content_type, original_name FROM eerms_receipt_files WHERE filename = $1', [filename]);
   if (result.rows.length === 0) return null;
   return result.rows[0];
 }
@@ -164,16 +166,16 @@ function hasPersistentStorage() {
   return Boolean(pgPool);
 }
 
-async function loadFromPostgres() {
-  if (!pgPool) return false;
-  await pgPool.query(`
+async function loadFromPostgres(queryable = pgPool) {
+  if (!queryable) return false;
+  await queryable.query(`
     CREATE TABLE IF NOT EXISTS eerms_store (
       id SMALLINT PRIMARY KEY,
       data JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  const result = await pgPool.query('SELECT data, updated_at FROM eerms_store WHERE id = 1');
+  const result = await queryable.query('SELECT data, updated_at::text AS updated_at, xmin::text AS revision FROM eerms_store WHERE id = 1');
   if (result.rows.length === 0) return false;
   const d = result.rows[0].data;
   ['users', 'bank', 'claims', 'notifications', 'audit'].forEach((k) => { db[k] = d[k] || []; });
@@ -190,9 +192,9 @@ async function loadFromPostgres() {
   });
   db.budget = d.budget || db.budget;
   db.seq = d.seq || db.seq;
-  if (result.rows[0].updated_at) {
-    lastLoadedTime = new Date(result.rows[0].updated_at).getTime();
-  }
+  lastLoadedTime = result.rows[0].updated_at || '';
+  lastLoadedRevision = result.rows[0].revision || '';
+  lastSaved = JSON.stringify(db);
   return db.users.length > 0;
 }
 
@@ -223,68 +225,124 @@ function loadFromDisk() {
     return db.users.length > 0;
   } catch { return false; }
 }
-let lastSaved = '';
-let pgSaveQueue = Promise.resolve();
-
-async function persist() {
+async function persist(queryable = null) {
   if (process.env.NODE_ENV === 'test') return;
   const out = JSON.stringify(db);
   if (out === lastSaved) return;
 
   if (pgPool) {
     try {
-      const res = await pgPool.query(`
+      const executor = queryable || pgPool;
+      const res = await executor.query(`
         INSERT INTO eerms_store (id, data, updated_at)
         VALUES (1, $1::jsonb, now())
         ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-        RETURNING updated_at
+        RETURNING updated_at::text AS updated_at, xmin::text AS revision
       `, [out]);
       lastSaved = out;
-      if (res.rows[0]?.updated_at) {
-        lastLoadedTime = new Date(res.rows[0].updated_at).getTime();
-      }
+      if (res.rows[0]?.updated_at) lastLoadedTime = res.rows[0].updated_at;
+      if (res.rows[0]?.revision) lastLoadedRevision = res.rows[0].revision;
     } catch (e) {
       console.error('PostgreSQL persist failed:', e.message);
+      throw e;
     }
+    return;
   }
 
+  if (process.env.VERCEL) throw new Error('Persistent PostgreSQL storage is required on Vercel.');
   try {
     fs.mkdirSync(path.dirname(FILE), { recursive: true });
     fs.writeFileSync(FILE + '.tmp', out);
     fs.renameSync(FILE + '.tmp', FILE);
     lastSaved = out;
-  } catch (e) { console.error('persist failed', e.message); }
+  } catch (e) {
+    console.error('persist failed', e.message);
+    throw e;
+  }
 }
 
 async function syncStore() {
   await initializeStore();
   if (pgPool) {
     try {
-      const res = await pgPool.query('SELECT updated_at FROM eerms_store WHERE id = 1');
+      const res = await pgPool.query('SELECT updated_at::text AS updated_at, xmin::text AS revision FROM eerms_store WHERE id = 1');
       if (res.rows.length > 0) {
-        const dbTime = new Date(res.rows[0].updated_at).getTime();
-        if (dbTime > lastLoadedTime) {
-          await loadFromPostgres();
-        }
+        const dbTime = res.rows[0].updated_at || '';
+        const revision = res.rows[0].revision || '';
+        if (dbTime !== lastLoadedTime || revision !== lastLoadedRevision) await loadFromPostgres();
       }
     } catch (err) {
       console.warn('Sync check failed:', err.message);
+      throw err;
     }
+  }
+}
+
+const STORE_LOCK_A = 1162101325;
+const STORE_LOCK_B = 1398038354;
+const STORE_LOCK = `SELECT pg_advisory_lock(${STORE_LOCK_A}, ${STORE_LOCK_B})`;
+const STORE_UNLOCK = `SELECT pg_advisory_unlock(${STORE_LOCK_A}, ${STORE_LOCK_B}) AS unlocked`;
+
+async function endStoreWrite(client) {
+  try {
+    const result = await client.query(STORE_UNLOCK);
+    if (!result.rows[0]?.unlocked) throw new Error('PostgreSQL store lock was not held.');
+    client.release();
+  } catch (error) {
+    client.release(true);
+    throw error;
+  }
+}
+
+async function beginStoreWrite() {
+  await initializeStore();
+  if (!pgPool) {
+    if (process.env.VERCEL) throw new Error('Persistent PostgreSQL storage is required on Vercel.');
+    return null;
+  }
+
+  const client = await pgPool.connect();
+  let locked = false;
+  try {
+    await client.query(STORE_LOCK);
+    locked = true;
+    if (!await loadFromPostgres(client)) {
+      throw new Error('Persistent application data is missing from PostgreSQL.');
+    }
+    return client;
+  } catch (error) {
+    if (locked) {
+      try {
+        await endStoreWrite(client);
+      } catch (releaseError) {
+        console.error('Could not release PostgreSQL store lock:', releaseError.message);
+      }
+    } else {
+      client.release();
+    }
+    throw error;
   }
 }
 
 async function initializeStore() {
   if (!initializationPromise) {
     initializationPromise = (async () => {
+      if (process.env.VERCEL && !pgPool) {
+        throw new Error('Persistent PostgreSQL storage is required on Vercel.');
+      }
       let loaded = false;
       if (pgPool) {
         try {
           loaded = await loadFromPostgres();
           console.log(loaded ? 'Loaded saved data from PostgreSQL' : 'Initialized PostgreSQL store');
         } catch (e) {
-          console.error('PostgreSQL load failed; falling back to JSON storage:', e.message);
+          console.error('PostgreSQL load failed:', e.message);
+          if (process.env.VERCEL) throw e;
           pgPool = null;
         }
+      }
+      if (process.env.VERCEL && !pgPool) {
+        throw new Error('Persistent PostgreSQL storage is required on Vercel.');
       }
       if (!loaded) loaded = loadFromDisk();
       if (!loaded) seed();
@@ -292,9 +350,12 @@ async function initializeStore() {
         await persist();
       } catch (err) {
         console.warn('Initial persist failed:', err.message);
+        if (pgPool || process.env.VERCEL) throw err;
       }
-      setInterval(() => persist(), 2000).unref();
-      ['SIGINT', 'SIGTERM'].forEach((sig) => process.on(sig, () => { persist().finally(() => process.exit(0)); }));
+      if (!pgPool) setInterval(() => persist().catch((err) => console.error('Scheduled persist failed:', err.message)), 2000).unref();
+      ['SIGINT', 'SIGTERM'].forEach((sig) => process.on(sig, () => {
+        persist().catch((err) => console.error('Shutdown persist failed:', err.message)).finally(() => process.exit(0));
+      }));
     })().catch((err) => {
       initializationPromise = null;
       throw err;
@@ -307,4 +368,4 @@ function getPersistenceType() {
   return pgPool ? 'postgresql' : 'json-file';
 }
 
-module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType, syncStore, persist, saveReceiptFile, getReceiptFile, hasPersistentStorage };
+module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType, syncStore, persist, beginStoreWrite, endStoreWrite, saveReceiptFile, getReceiptFile, hasPersistentStorage };

@@ -1,1 +1,285 @@
-{"users":[{"id":"f605dc94-5c47-4336-a7dc-e888401ebcec","empCode":"EMP-0001","status":"active","mustChange":false,"phone":"","joiningDate":"2024-01-15","fullName":"Meera Kapoor","email":"admin@abcsolutions.com","passwordHash":"$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6","role":"admin","branch":"Corporate HQ"},{"id":"cc84834e-265d-4712-8d96-03fac3a649a2","empCode":"EMP-0002","status":"active","mustChange":false,"phone":"","joiningDate":"2024-01-15","fullName":"Priya Nair","email":"hr@abcsolutions.com","passwordHash":"$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6","role":"hr","branch":"Corporate HQ"}],"bank":[],"claims":[],"notifications":[],"audit":[{"seq":1,"at":"2026-11-18T06:13:40.781Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"GENESIS","hash":"7acbe366a413b650710658df79dc84c7167d3a0ffffd34ffa7ee8888a091668d"},{"seq":2,"at":"2026-11-18T06:18:55.074Z","actorId":null,"actor":"system","action":"LOGIN_FAILED","entity":"auth","detail":"niyatirpatel99@gmail.com","ip":"::1","prev":"7acbe366a413b650710658df79dc84c7167d3a0ffffd34ffa7ee8888a091668d","hash":"d5c87bd7c0072139498db9f5d4f96a08ab307742fcab72d0c9ff5def2e53f393"},{"seq":3,"at":"2026-11-18T06:19:25.191Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"d5c87bd7c0072139498db9f5d4f96a08ab307742fcab72d0c9ff5def2e53f393","hash":"98bcc6297542398b8738a93299196a1f4082d22db5562cadfbe2ec2d03aa0ca9"},{"seq":4,"at":"2026-11-18T06:24:33.184Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"EMPLOYEE_CREATED","entity":"EMP-0003","detail":"bank Pending","ip":"::1","prev":"98bcc6297542398b8738a93299196a1f4082d22db5562cadfbe2ec2d03aa0ca9","hash":"1a820354aee13e5b32d086fee31bb1f392ba8ca20376f9d5f0270ccb68c52124"},{"seq":5,"at":"2026-11-18T06:25:06.017Z","actorId":"443cc118-ce81-4470-b6f2-d16df3752a7d","actor":"Patel (EMP-0003)","action":"PASSWORD_SET","entity":"auth","detail":"Password set from onboarding link","ip":"::1","prev":"1a820354aee13e5b32d086fee31bb1f392ba8ca20376f9d5f0270ccb68c52124","hash":"52f52f7fbdb6245e42065959d9e443010f4ae5fe25c729909eb97e900420f0f5"},{"seq":6,"at":"2026-11-18T06:25:08.694Z","actorId":"443cc118-ce81-4470-b6f2-d16df3752a7d","actor":"Patel (EMP-0003)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"52f52f7fbdb6245e42065959d9e443010f4ae5fe25c729909eb97e900420f0f5","hash":"6196e866caf2282da6067157b2bf366cd796a7d5400af5d1b50afc7aaee83e2c"},{"seq":7,"at":"2026-11-18T06:25:41.936Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"BANK_APPROVE","entity":"EMP-0003","detail":"","ip":"::1","prev":"6196e866caf2282da6067157b2bf366cd796a7d5400af5d1b50afc7aaee83e2c","hash":"5c6cdd0b10b72195e7e93dfb79f95ef35cb876a661e3708967b0343f1314241a"},{"seq":8,"at":"2026-11-18T06:50:22.039Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"5c6cdd0b10b72195e7e93dfb79f95ef35cb876a661e3708967b0343f1314241a","hash":"0a8ba56cefd1b9a1d1b0d06e69be5bf889b7480e15b952250168e7f7d4cdcd27"},{"seq":9,"at":"2026-11-18T06:51:04.128Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"EMPLOYEE_CREATED","entity":"EMP-0004","detail":"bank Pending","ip":"::1","prev":"0a8ba56cefd1b9a1d1b0d06e69be5bf889b7480e15b952250168e7f7d4cdcd27","hash":"7f74084066a2cdb9b60b79d12e1f445f2a9190bcb8acac018841175ca927d09c"},{"seq":10,"at":"2026-11-18T07:28:23.492Z","actorId":"cc84834e-265d-4712-8d96-03fac3a649a2","actor":"Priya Nair (EMP-0002)","action":"EMPLOYEE_CREATED","entity":"EMP-0003","detail":"bank Pending","ip":"::1","prev":"7f74084066a2cdb9b60b79d12e1f445f2a9190bcb8acac018841175ca927d09c","hash":"3f8d3d448d078076b32a0c17d237736a5e9c269140a2eec468433b7985735e09"},{"seq":11,"at":"2026-11-18T07:28:46.767Z","actorId":"9a994d48-1cac-49f8-9efc-c32b8730215c","actor":"niyati (EMP-0003)","action":"PASSWORD_SET","entity":"auth","detail":"Password set from onboarding link","ip":"::1","prev":"3f8d3d448d078076b32a0c17d237736a5e9c269140a2eec468433b7985735e09","hash":"386f22966935818d4302c2fb363e66a5fdd70c9789082f91d096e442c5a4e5a8"},{"seq":12,"at":"2026-11-18T07:29:10.827Z","actorId":"9a994d48-1cac-49f8-9efc-c32b8730215c","actor":"niyati (EMP-0003)","action":"LOGIN","entity":"auth","detail":"Signed in","ip":"::1","prev":"386f22966935818d4302c2fb363e66a5fdd70c9789082f91d096e442c5a4e5a8","hash":"e68c253f717e9365b14487f8e2f562d8c130dd10eac76f2181bfb2d380dd40bf"}],"budget":{"monthly":200000,"categories":{"PLANE":50000,"TRAIN":20000,"ROAD":15000,"MEALS":40000,"HOTEL":50000,"SUPPLIES":25000}},"seq":{"claim":6,"batch":0}}
+{
+    "seq": {
+        "batch": 0,
+        "claim": 8
+    },
+    "bank": [
+        {
+            "ifsc": "HDFC0001234",
+            "status": "Pending",
+            "userId": "3ea56f5d-0336-4fdc-85cf-ea5e2179d896",
+            "bankName": "SBI",
+            "verifiedAt": null,
+            "rejectReason": null,
+            "accountHolder": "Rushabh",
+            "accountNumber": "454968446549848215",
+            "verificationChecklist": [
+                false,
+                false,
+                false
+            ]
+        }
+    ],
+    "audit": [],
+    "users": [
+        {
+            "id": "f605dc94-5c47-4336-a7dc-e888401ebcec",
+            "role": "admin",
+            "email": "admin@abcsolutions.com",
+            "phone": "",
+            "branch": "Corporate HQ",
+            "status": "active",
+            "empCode": "EMP-0001",
+            "fullName": "Meera Kapoor",
+            "mustChange": false,
+            "joiningDate": "2024-01-15",
+            "passwordHash": "$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6"
+        },
+        {
+            "id": "cc84834e-265d-4712-8d96-03fac3a649a2",
+            "role": "hr",
+            "email": "hr@abcsolutions.com",
+            "phone": "",
+            "branch": "Corporate HQ",
+            "status": "active",
+            "empCode": "EMP-0002",
+            "fullName": "Priya Nair",
+            "mustChange": false,
+            "joiningDate": "2024-01-15",
+            "passwordHash": "$2a$08$BfhOuZ8NmtGBQ7ibWIfFmOBm2UD4JTq8Vt1T.a3UBA/mOzTqf9Di6"
+        },
+        {
+            "id": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "role": "employee",
+            "email": "niyatirpatel99@gmail.com",
+            "phone": "8320424730",
+            "branch": "Branch A",
+            "status": "active",
+            "empCode": "EMP-0003",
+            "fullName": "Niyati Patel",
+            "mustChange": false,
+            "joiningDate": "2024-11-18",
+            "passwordHash": "$2a$08$jUrr5x4KUkQyYEzL3ObG9.j96NrR0sm.WmhPwbGfKBOZYsLEKz7Oa",
+            "setupTokenHash": null,
+            "setupTokenExpiresAt": null,
+            "passwordResetTokenHash": null,
+            "passwordResetTokenExpiresAt": null
+        },
+        {
+            "id": "c1bd3089-8467-4402-a7f6-e6fc11e9b961",
+            "role": "employee",
+            "email": "niyatipatel2606@gmail.com",
+            "phone": "8320424730",
+            "branch": "Branch B",
+            "status": "active",
+            "empCode": "EMP-0004",
+            "fullName": "Ravi Amin",
+            "mustChange": false,
+            "joiningDate": "2025-02-03",
+            "passwordHash": "$2a$08$G1qqV2j/5p/fOSGXq/6kJevyDHU39HvuEumktpM50Di2.WcwephJ.",
+            "setupTokenHash": null,
+            "setupTokenExpiresAt": null,
+            "passwordResetTokenHash": null,
+            "passwordResetTokenExpiresAt": null
+        },
+        {
+            "id": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "role": "finance",
+            "email": "patelniyati266@gmail.com",
+            "phone": "1234565432",
+            "branch": "Corporate HQ",
+            "status": "active",
+            "empCode": "EMP-0005",
+            "fullName": "Shalin Amin",
+            "mustChange": false,
+            "passwordHash": "$2a$08$U3M5OdezP4AqgfCqPk8yLupiHxPGmJu/XPwF8jQfrOb/XZ11QahlG",
+            "setupTokenHash": null,
+            "setupTokenExpiresAt": null,
+            "passwordResetTokenHash": null,
+            "passwordResetTokenExpiresAt": null
+        },
+        {
+            "id": "3ea56f5d-0336-4fdc-85cf-ea5e2179d896",
+            "role": "employee",
+            "email": "rushabh.sacesta@gmail.com",
+            "phone": "7045326613",
+            "branch": "Branch A",
+            "status": "active",
+            "empCode": "EMP-0006",
+            "fullName": "Rushabh Solanki",
+            "mustChange": false,
+            "joiningDate": "2026-11-19",
+            "passwordHash": "$2a$08$1mOKPDHY0UQEy55CUgNhkODHfuZC3HaNTVbbr0mROl7KmXfuyLjRm",
+            "setupTokenHash": null,
+            "setupTokenExpiresAt": null,
+            "passwordResetTokenHash": null,
+            "passwordResetTokenExpiresAt": null
+        }
+    ],
+    "budget": {
+        "monthly": 200000,
+        "categories": {
+            "ROAD": 15000,
+            "HOTEL": 50000,
+            "MEALS": 40000,
+            "PLANE": 50000,
+            "TRAIN": 20000,
+            "SUPPLIES": 25000
+        }
+    },
+    "claims": [],
+    "notifications": [
+        {
+            "at": "2026-11-18T10:35:10.435Z",
+            "id": "b93072b9-9b34-4509-b3ed-fba6e90b9545",
+            "link": "/employee/profile",
+            "read": false,
+            "userId": "c1bd3089-8467-4402-a7f6-e6fc11e9b961",
+            "message": "Your bank details were rejected: IFSC does not matches. Contact HR."
+        },
+        {
+            "at": "2026-11-18T10:54:41.538Z",
+            "id": "9b34ce72-8d59-401e-ad29-9018890b4a8d",
+            "link": "/finance/review/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": false,
+            "userId": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "message": "Niyati Patel submitted EXP-2026-0007 (₹5,000) — new in the Shared Queue"
+        },
+        {
+            "at": "2026-11-18T10:56:08.736Z",
+            "id": "0d9fa751-2b57-45fe-8286-18bd043d12ba",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007 is now under review"
+        },
+        {
+            "at": "2026-11-18T10:56:56.877Z",
+            "id": "b83df28c-1320-4d1a-b47e-fc46b4155b17",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007: INFO REQUESTED — please upload receipt again"
+        },
+        {
+            "at": "2026-11-18T10:57:49.961Z",
+            "id": "0ed11c1e-e041-4f53-b92f-e4d6335644ed",
+            "link": "/finance/review/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": false,
+            "userId": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "message": "Niyati Patel resubmitted EXP-2026-0007 (₹5,000) — new in the Shared Queue"
+        },
+        {
+            "at": "2026-11-18T10:57:58.899Z",
+            "id": "53f33602-5659-4bdf-abe7-bf2feddbc915",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007 is now under review"
+        },
+        {
+            "at": "2026-11-18T11:12:00.593Z",
+            "id": "bc7e96ec-7afc-4842-be3c-27b4334a42f8",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007: INFO REQUESTED — add image again"
+        },
+        {
+            "at": "2026-11-18T11:12:32.642Z",
+            "id": "b43764cd-1f23-403e-bde5-4f0aa7bf1c0d",
+            "link": "/finance/review/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": false,
+            "userId": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "message": "Niyati Patel resubmitted EXP-2026-0007 (₹5,000) — new in the Shared Queue"
+        },
+        {
+            "at": "2026-11-18T11:12:41.608Z",
+            "id": "48358ed7-a6f6-453f-85e5-7f9f28492a38",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007 is now under review"
+        },
+        {
+            "at": "2026-11-18T11:13:00.641Z",
+            "id": "6089b0aa-def9-4141-a4ec-f017f0038699",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007: INFO REQUESTED — add pdf"
+        },
+        {
+            "at": "2026-11-18T11:13:26.814Z",
+            "id": "d42eb171-d015-4e2c-9067-515ff4fdefce",
+            "link": "/finance/review/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": false,
+            "userId": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "message": "Niyati Patel resubmitted EXP-2026-0007 (₹5,000) — new in the Shared Queue"
+        },
+        {
+            "at": "2026-11-18T11:13:39.670Z",
+            "id": "21c94405-ab02-48a0-9660-ef9ea0597ee8",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007 is now under review"
+        },
+        {
+            "at": "2026-11-18T11:16:15.557Z",
+            "id": "d3696d2d-1f03-4727-89d6-c361ae4d6365",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007: INFO REQUESTED — not loading"
+        },
+        {
+            "at": "2026-11-18T11:16:48.827Z",
+            "id": "496ede16-e710-4429-89c4-93146f7ae8df",
+            "link": "/finance/review/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": false,
+            "userId": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "message": "Niyati Patel resubmitted EXP-2026-0007 (₹5,000) — new in the Shared Queue"
+        },
+        {
+            "at": "2026-11-18T11:17:32.554Z",
+            "id": "b7ab76c8-7cbc-4e2e-88ff-d5e970a7a101",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007 is now under review"
+        },
+        {
+            "at": "2026-11-18T11:17:36.011Z",
+            "id": "f1957466-11d7-4295-a38a-bb0a6ecd9eb0",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007: APPROVED"
+        },
+        {
+            "at": "2026-11-18T11:18:59.056Z",
+            "id": "4c5e4123-c568-43c3-8c89-db9c39631643",
+            "link": "/employee/claims/a37fe783-d856-40a5-ae28-47e57b0559e4",
+            "read": true,
+            "userId": "79e0898c-95f9-4c84-9698-6c08cbe4baf8",
+            "message": "EXP-2026-0007 paid — ₹5,000 credited. UTR 345432ERFD"
+        },
+        {
+            "at": "2026-11-18T11:26:55.478Z",
+            "id": "ae056678-09f8-4806-89ee-379566b2d748",
+            "link": "/finance/review/51713e84-e673-46e2-8361-0fc7c9e988ed",
+            "read": false,
+            "userId": "5ffdd169-e1c0-4f0f-afe1-76c9152a7ab3",
+            "message": "Ravi Amin submitted EXP-2026-0008 (₹3,499.84) — new in the Shared Queue"
+        },
+        {
+            "at": "2026-11-18T11:27:13.226Z",
+            "id": "7336f8ef-ec80-4a7d-b963-5ae82f4ea656",
+            "link": "/employee/claims/51713e84-e673-46e2-8361-0fc7c9e988ed",
+            "read": false,
+            "userId": "c1bd3089-8467-4402-a7f6-e6fc11e9b961",
+            "message": "EXP-2026-0008 is now under review"
+        }
+    ]
+}
