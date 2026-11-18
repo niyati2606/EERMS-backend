@@ -106,6 +106,9 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
   process.env.STORAGE_URL ||
+  process.env.STORAGE_DATABASE_URL ||
+  process.env.STORAGE_POSTGRES_URL ||
+  process.env.DB_URL ||
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.POSTGRES_PRISMA_URL;
 let pgPool = null;
@@ -120,6 +123,7 @@ if (DATABASE_URL) {
     idleTimeoutMillis: 10000,
     max: 1,
   });
+  console.log('PostgreSQL database pool configured.');
 }
 
 let lastLoadedTime = 0;
