@@ -117,6 +117,8 @@ if (DATABASE_URL) {
   });
 }
 
+let lastLoadedTime = 0;
+
 async function loadFromPostgres() {
   if (!pgPool) return false;
   await pgPool.query(`
@@ -126,7 +128,7 @@ async function loadFromPostgres() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  const result = await pgPool.query('SELECT data FROM eerms_store WHERE id = 1');
+  const result = await pgPool.query('SELECT data, updated_at FROM eerms_store WHERE id = 1');
   if (result.rows.length === 0) return false;
   const d = result.rows[0].data;
   ['users', 'bank', 'claims', 'notifications', 'audit'].forEach((k) => { db[k] = d[k] || []; });
@@ -143,6 +145,9 @@ async function loadFromPostgres() {
   });
   db.budget = d.budget || db.budget;
   db.seq = d.seq || db.seq;
+  if (result.rows[0].updated_at) {
+    lastLoadedTime = new Date(result.rows[0].updated_at).getTime();
+  }
   return db.users.length > 0;
 }
 
@@ -182,18 +187,20 @@ async function persist() {
   if (out === lastSaved) return;
 
   if (pgPool) {
-    pgSaveQueue = pgSaveQueue
-      .then(() => pgPool.query(`
+    try {
+      const res = await pgPool.query(`
         INSERT INTO eerms_store (id, data, updated_at)
         VALUES (1, $1::jsonb, now())
         ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-      `, [out]))
-      .then(() => { lastSaved = out; })
-      .catch((e) => {
-        console.error('PostgreSQL persist failed:', e.message);
-      });
-    await pgSaveQueue;
-    return;
+        RETURNING updated_at
+      `, [out]);
+      lastSaved = out;
+      if (res.rows[0]?.updated_at) {
+        lastLoadedTime = new Date(res.rows[0].updated_at).getTime();
+      }
+    } catch (e) {
+      console.error('PostgreSQL persist failed:', e.message);
+    }
   }
 
   try {
@@ -202,6 +209,23 @@ async function persist() {
     fs.renameSync(FILE + '.tmp', FILE);
     lastSaved = out;
   } catch (e) { console.error('persist failed', e.message); }
+}
+
+async function syncStore() {
+  await initializeStore();
+  if (pgPool) {
+    try {
+      const res = await pgPool.query('SELECT updated_at FROM eerms_store WHERE id = 1');
+      if (res.rows.length > 0) {
+        const dbTime = new Date(res.rows[0].updated_at).getTime();
+        if (dbTime > lastLoadedTime) {
+          await loadFromPostgres();
+        }
+      }
+    } catch (err) {
+      console.warn('Sync check failed:', err.message);
+    }
+  }
 }
 
 async function initializeStore() {
@@ -238,4 +262,4 @@ function getPersistenceType() {
   return pgPool ? 'postgresql' : 'json-file';
 }
 
-module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType };
+module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType, syncStore, persist };

@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { db, POLICY, notify, initializeStore, getPersistenceType } = require('./store');
+const { db, POLICY, notify, initializeStore, syncStore, persist, getPersistenceType } = require('./store');
 const { auth } = require('./middleware/auth');
 const { uploadErrors } = require('./middleware/uploadMiddleware');
 const claims = require('./routes/claims');
@@ -11,14 +11,41 @@ const { businessHoursBetween, normalizeLock } = require('./claimUtil');
 
 const app = express();
 app.use(helmet({ crossOriginResourcePolicy: false }));
+
 app.use(async (req, res, next) => {
   try {
-    await initializeStore();
-    next();
+    await syncStore();
   } catch (error) {
-    console.error('Store initialization failed:', error);
-    res.status(503).json({ message: 'Application store unavailable' });
+    console.error('Store sync failed:', error);
   }
+
+  // Await persistence on any modifying request before response is sent back to client
+  const originalJson = res.json.bind(res);
+  const originalSend = res.send.bind(res);
+  let saved = false;
+
+  const autoPersist = async () => {
+    if (saved) return;
+    saved = true;
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+      try {
+        await persist();
+      } catch (err) {
+        console.error('Auto-persist error:', err.message);
+      }
+    }
+  };
+
+  res.json = async function (data) {
+    await autoPersist();
+    return originalJson(data);
+  };
+  res.send = async function (data) {
+    await autoPersist();
+    return originalSend(data);
+  };
+
+  next();
 });
 
 const allowedOrigin = process.env.CLIENT_ORIGIN;
