@@ -128,6 +128,42 @@ if (DATABASE_URL) {
 
 let lastLoadedTime = 0;
 
+// ---------- Receipt file storage in PostgreSQL ----------
+async function ensureReceiptTable() {
+  if (!pgPool) return;
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS eerms_receipt_files (
+      filename TEXT PRIMARY KEY,
+      file_data BYTEA NOT NULL,
+      content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      original_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+async function saveReceiptFile(filename, buffer, contentType, originalName) {
+  if (!pgPool) return;
+  await ensureReceiptTable();
+  await pgPool.query(`
+    INSERT INTO eerms_receipt_files (filename, file_data, content_type, original_name)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (filename) DO UPDATE SET file_data = EXCLUDED.file_data, content_type = EXCLUDED.content_type
+  `, [filename, buffer, contentType, originalName || filename]);
+}
+
+async function getReceiptFile(filename) {
+  if (!pgPool) return null;
+  await ensureReceiptTable();
+  const result = await pgPool.query('SELECT file_data, content_type, original_name FROM eerms_receipt_files WHERE filename = $1', [filename]);
+  if (result.rows.length === 0) return null;
+  return result.rows[0];
+}
+
+function hasPersistentStorage() {
+  return Boolean(pgPool);
+}
+
 async function loadFromPostgres() {
   if (!pgPool) return false;
   await pgPool.query(`
@@ -271,4 +307,4 @@ function getPersistenceType() {
   return pgPool ? 'postgresql' : 'json-file';
 }
 
-module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType, syncStore, persist };
+module.exports = { db, CATEGORIES, CATEGORY_LABELS, BRANCHES, POLICY, DEFAULT_PASSWORD, hash, addUser, addBank, nextEmpCode, nextTicket, audit, verifyAuditChain, notify, notifyRole, publicUser, maskAcct, initializeStore, getPersistenceType, syncStore, persist, saveReceiptFile, getReceiptFile, hasPersistentStorage };
