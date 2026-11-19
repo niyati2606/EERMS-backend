@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { db, audit } = require('../store');
 const { auth, role } = require('../middleware/auth');
+const { isValidPersonName } = require('../validation');
 
 router.use(auth, role('employee'));
 
@@ -32,6 +33,7 @@ router.get('/profile', (req, res) => res.json(profile(req.user)));
 router.put('/profile', (req, res) => {
   const { fullName, phone } = req.body || {};
   if (!String(fullName || '').trim()) return res.status(400).json({ message: 'Full name is required' });
+  if (!isValidPersonName(fullName)) return res.status(400).json({ message: 'Full name can contain letters and spaces only' });
   if (String(fullName).trim().length > 150) return res.status(400).json({ message: 'Full name must be 150 characters or fewer' });
   if (phone !== undefined && String(phone).length > 20) return res.status(400).json({ message: 'Phone must be 20 characters or fewer' });
   req.user.fullName = String(fullName).trim();

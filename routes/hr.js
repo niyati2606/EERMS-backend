@@ -4,6 +4,7 @@ const { db, BRANCHES, addUser, addBank, nextEmpCode, audit, notify, publicUser }
 const { auth, role } = require('../middleware/auth');
 const { view, getFrontendUrl } = require('../claimUtil');
 const { sendEmail } = require('../mailer');
+const { isValidPersonName } = require('../validation');
 
 router.use(auth, role('hr'));
 
@@ -70,6 +71,7 @@ router.put('/finance/:id', (req, res) => {
   const branch = typeof b.branch === 'string' ? b.branch.trim() : '';
 
   if (!fullName) return res.status(400).json({ message: 'Full name is required' });
+  if (!isValidPersonName(fullName)) return res.status(400).json({ message: 'Full name can contain letters and spaces only' });
   if (!EMAIL.test(email)) return res.status(400).json({ message: 'Official email is invalid' });
   if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === email)) {
     return res.status(400).json({ message: 'A user with this email already exists' });
@@ -91,6 +93,7 @@ router.post('/finance', async (req, res) => {
   const errors = [];
   const req_ = (k, label) => { if (!b[k] || !String(b[k]).trim()) errors.push(`${label} is required`); };
   [['fullName', 'Full name'], ['email', 'Official email'], ['phone', 'Phone number'], ['branch', 'Branch']].forEach(([k, l]) => req_(k, l));
+  if (String(b.fullName || '').trim() && !isValidPersonName(b.fullName)) errors.push('Full name can contain letters and spaces only');
   if (b.email && !EMAIL.test(b.email)) errors.push('Official email is invalid');
   if (b.email && db.users.some((u) => u.email.toLowerCase() === b.email.toLowerCase())) errors.push('A user with this email already exists');
   if (b.branch && !BRANCHES.includes(b.branch)) errors.push('Unknown branch');
@@ -176,6 +179,8 @@ router.post('/employees', async (req, res) => {
   [['fullName', 'Full name'], ['email', 'Official email'], ['phoneNumber', 'Phone'],
     ['branchLocation', 'Branch location'], ['joiningDate', 'Joining date'], ['accountHolderName', 'Account holder name'],
     ['bankName', 'Bank name'], ['accountNumber', 'Account number'], ['ifscCode', 'IFSC code']].forEach(([k, l]) => req_(k, l));
+  if (String(b.fullName || '').trim() && !isValidPersonName(b.fullName)) errors.push('Full name can contain letters and spaces only');
+  if (String(b.accountHolderName || '').trim() && !isValidPersonName(b.accountHolderName)) errors.push('Account holder name can contain letters and spaces only');
   if (b.joiningDate && !isValidDate(b.joiningDate)) errors.push('Joining date is invalid');
   if (b.email && !EMAIL.test(b.email)) errors.push('Official email is invalid');
   if (b.email && db.users.some((u) => u.email.toLowerCase() === b.email.toLowerCase())) errors.push('An employee with this email already exists');
@@ -221,6 +226,11 @@ router.put('/employees/:id', (req, res) => {
   const b = req.body || {};
   const beforeBranch = u.branch;
   const beforeEmail = u.email;
+  if (b.fullName !== undefined) {
+    if (typeof b.fullName !== 'string' || !b.fullName.trim()) return res.status(400).json({ message: 'Full name is required' });
+    if (!isValidPersonName(b.fullName)) return res.status(400).json({ message: 'Full name can contain letters and spaces only' });
+    b.fullName = b.fullName.trim();
+  }
   if (b.branch && !BRANCHES.includes(b.branch)) return res.status(400).json({ message: 'Unknown branch' });
   if (b.joiningDate !== undefined && b.joiningDate !== '' && !isValidDate(b.joiningDate)) return res.status(400).json({ message: 'Joining date is invalid' });
   if (b.email !== undefined) {
@@ -256,6 +266,9 @@ router.put('/employees/:id/bank', (req, res) => {
     if (typeof b[field] !== 'string' || !b[field].trim()) {
       return res.status(400).json({ message: `${label} is required` });
     }
+  }
+  if (!isValidPersonName(b.accountHolder)) {
+    return res.status(400).json({ message: 'Account holder name can contain letters and spaces only' });
   }
 
   const accountNumber = b.accountNumber.trim();

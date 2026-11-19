@@ -8,7 +8,16 @@ const { receiptUpload, sha256File, removeFiles, ROOT } = require('../middleware/
 const { view, duplicateIndicators } = require('../claimUtil');
 
 const PROVIDERS = ['Ola', 'Uber', 'Rapido'];
+const MAX_AMOUNT = 150000;
+const MAX_EXPENSE_DATE_AGE_DAYS = 15;
 const mine = (req) => db.claims.filter((c) => c.employeeId === req.user.id);
+const hasAlphabeticText = (value) => /\p{L}/u.test(String(value || ''));
+const hasAllowedTextCharacters = (value) => /^[\p{L} -]+$/u.test(String(value || '').trim());
+const isValidIsoDate = (value) => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
 
 // Claim submission is for the Employee role only.
 router.use(auth, role('employee'));
@@ -27,20 +36,36 @@ router.get('/:id', (req, res) => {
 
 function validateLines(lines) {
   const errors = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const earliestDate = new Date(Date.now() - MAX_EXPENSE_DATE_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   if (!lines.length) errors.push('Add at least one expense line');
   lines.forEach((l, i) => {
     const n = `Line ${i + 1}`;
     if (!l.date) errors.push(`${n}: date is required`);
-    else if (new Date(l.date) > new Date()) errors.push(`${n}: date cannot be in the future`);
+    else if (!isValidIsoDate(l.date)) errors.push(`${n}: date is invalid`);
+    else if (l.date > today) errors.push(`${n}: expense date cannot be in the future`);
+    else if (l.date < earliestDate) errors.push(`${n}: expense date cannot be more than 15 days old`);
     if (!CATEGORIES.includes(l.category)) errors.push(`${n}: choose a category`);
     if (!(l.amount > 0)) errors.push(`${n}: amount must be greater than ₹0`);
-    if (!l.reason || !String(l.reason).trim()) errors.push(`${n}: business reason is required`);
     if (l.category === 'ROAD') {
       if (!PROVIDERS.includes(l.provider)) errors.push(`${n}: road travel must be Ola, Uber or Rapido`);
       if (!l.bookingId || !String(l.bookingId).trim()) errors.push(`${n}: ride Booking ID is required`);
       if (!Number.isFinite(Number(l.distanceKm)) || Number(l.distanceKm) <= 0) errors.push(`${n}: distance in kilometres is required`);
     }
     if (!l.receipt) errors.push(`${n}: a receipt (PDF/JPG/PNG < 200 KB) is mandatory`);
+  });
+  return errors;
+}
+
+function validateRequiredFields(title, lines) {
+  const errors = [];
+  if (!hasAlphabeticText(title)) errors.push('Claim title is required');
+  else if (!hasAllowedTextCharacters(title)) errors.push('Claim title can contain letters, spaces, and hyphens only');
+  lines.forEach((line, i) => {
+    const field = `Line ${i + 1}: business reason`;
+    if (!hasAlphabeticText(line.reason)) errors.push(`${field} is required`);
+    else if (!hasAllowedTextCharacters(line.reason)) errors.push(`${field} can contain letters, spaces, and hyphens only`);
+    if (line.amount > MAX_AMOUNT) errors.push(`Line ${i + 1}: amount cannot exceed ₹1,50,000`);
   });
   return errors;
 }
@@ -60,16 +85,16 @@ async function save(req, res, existing) {
     else if (l.id && old.get(l.id) && old.get(l.id).receipt) receipt = old.get(l.id).receipt;
     return {
       id: l.id && old.has(l.id) ? l.id : crypto.randomUUID(), date: l.date, category: l.category, amount: Number(l.amount) || 0,
-      reason: l.reason || '', provider: l.category === 'ROAD' ? l.provider || null : null,
+      reason: typeof l.reason === 'string' ? l.reason.trim() : '', provider: l.category === 'ROAD' ? l.provider || null : null,
       bookingId: l.category === 'ROAD' ? l.bookingId || null : null,
       distanceKm: l.category === 'ROAD' && l.distanceKm ? Number(l.distanceKm) : null, receipt,
     };
   });
+  const title = typeof payload.title === 'string' ? payload.title.trim() : '';
   const submit = !!payload.submit;
-  if (submit) {
-    const errors = validateLines(lines);
-    if (errors.length) return bail(400, 'Please fix the highlighted issues', errors);
-  }
+  const errors = validateRequiredFields(title, lines);
+  if (submit) errors.push(...validateLines(lines));
+  if (errors.length) return bail(400, 'Please fix the highlighted issues', errors);
   if (files.length && process.env.VERCEL && !hasPersistentStorage()) {
     return bail(503, 'Receipt uploads on Vercel require a configured PostgreSQL DATABASE_URL.');
   }
@@ -95,7 +120,7 @@ async function save(req, res, existing) {
     claim = { id: crypto.randomUUID(), ticketRef: null, employeeId: req.user.id, status: 'DRAFT', createdAt: now, history: [], lockedBy: null, lockExpires: null, decisionNote: null, utr: null, paidAt: null, approvedAt: null, batchId: null };
     db.claims.push(claim);
   }
-  claim.title = (payload.title || 'Expense claim').slice(0, 120);
+  claim.title = title.slice(0, 120);
   claim.lines = lines; claim.total = total;
   if (submit) {
     const resub = claim.status === 'INFO_REQUESTED';

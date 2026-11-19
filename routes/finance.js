@@ -3,6 +3,8 @@ const { db, POLICY, audit, notify } = require('../store');
 const { auth, role } = require('../middleware/auth');
 const { view, normalizeLock, businessHoursBetween } = require('../claimUtil');
 
+const hasOnlyLettersAndSpaces = (value) => /^[\p{L} ]*$/u.test(value);
+
 router.use(auth, role('finance'));
 
 const find = (id) => db.claims.find((c) => c.id === id);
@@ -33,6 +35,56 @@ router.get('/stats', (req, res) => {
     paid: all.filter((c) => c.status === 'PAID').length,
     infoRequested: all.filter((c) => c.status === 'INFO_REQUESTED').length,
   });
+});
+
+router.get('/history', (req, res) => {
+  const statuses = ['APPROVED', 'REJECTED'];
+  const status = String(req.query.status || 'ALL').trim().toUpperCase();
+  if (status !== 'ALL' && !statuses.includes(status)) {
+    return res.status(400).json({ message: 'Invalid claim status filter' });
+  }
+  const month = String(req.query.month || new Date().toISOString().slice(0, 7)).trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    return res.status(400).json({ message: 'Month filter must use YYYY-MM format' });
+  }
+  const branches = [...new Set(db.users
+    .filter((user) => user.role === 'employee' && user.branch)
+    .map((user) => String(user.branch).trim())
+    .filter(Boolean))].sort();
+  const branch = String(req.query.branch || 'ALL').trim();
+  if (branch !== 'ALL' && !branches.includes(branch)) {
+    return res.status(400).json({ message: 'Invalid branch filter' });
+  }
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const list = db.claims
+    .filter((claim) => statuses.includes(normalizeLock(claim).status))
+    .map((claim) => {
+      const employee = db.users.find((user) => user.id === claim.employeeId);
+      return {
+        id: claim.id,
+        ticketRef: claim.ticketRef,
+        title: claim.title,
+        status: claim.status,
+        createdAt: claim.createdAt,
+        submittedAt: claim.submittedAt,
+        approvedAt: claim.approvedAt,
+        paidAt: claim.paidAt,
+        total: claim.total,
+        decisionNote: claim.decisionNote || (claim.history || []).slice().reverse().find((entry) => entry.status === claim.status)?.note || null,
+        employee: {
+          fullName: employee?.fullName || 'Employee record unavailable',
+          empCode: employee?.empCode || '—',
+          branch: employee?.branch || '—',
+        },
+      };
+    })
+    .filter((claim) => (status === 'ALL' || claim.status === status)
+      && (branch === 'ALL' || claim.employee.branch === branch)
+      && String(claim.submittedAt || claim.createdAt || '').slice(0, 7) === month
+      && (!q || [claim.ticketRef, claim.title, claim.employee.fullName, claim.employee.empCode, claim.employee.branch, claim.id]
+        .some((value) => String(value || '').toLowerCase().includes(q))))
+    .sort((a, b) => new Date(b.submittedAt || b.createdAt) - new Date(a.submittedAt || a.createdAt));
+  res.json({ claims: list, branches });
 });
 
 router.get('/claims/:id', (req, res) => {
@@ -70,6 +122,7 @@ router.post('/claims/:id/release', (req, res) => {
   if (!lockValid(c, req.user.id)) return res.status(403).json({ message: 'You do not hold an active lock' });
   const note = String(req.body?.note || '').trim();
   if (!note) return res.status(400).json({ message: 'A handoff remark is required to release this claim' });
+  if (!hasOnlyLettersAndSpaces(note)) return res.status(400).json({ message: 'Handoff remarks can contain letters and spaces only' });
   if (note.length > 500) return res.status(400).json({ message: 'Handoff remark must be 500 characters or fewer' });
   const now = new Date().toISOString();
   c.lockedBy = null; c.lockExpires = null;
@@ -87,11 +140,14 @@ router.post('/claims/:id/decision', (req, res) => {
   if (c.employeeId === req.user.id) return res.status(403).json({ message: 'You cannot approve your own claim' });
   if (!lockValid(c, req.user.id)) return res.status(409).json({ message: 'Your one-hour lock has expired or is not held. Click [Assign to Me] again.' });
   const { decision, note } = req.body || {};
+  const decisionNote = typeof note === 'string' ? note.trim() : '';
   if (!['approve', 'info', 'reject'].includes(decision)) return res.status(400).json({ message: 'Invalid decision' });
-  if (decision !== 'approve' && !(note && note.trim())) return res.status(400).json({ message: 'A written note is mandatory for Request Info / Reject' });
+  if (decision !== 'approve' && !decisionNote) return res.status(400).json({ message: 'A written note is mandatory for Request Info / Reject' });
+  if (!hasOnlyLettersAndSpaces(decisionNote)) return res.status(400).json({ message: 'Decision notes can contain letters and spaces only' });
+  if (decisionNote.length > 500) return res.status(400).json({ message: 'Decision notes must be 500 characters or fewer' });
   const now = new Date().toISOString();
   const map = { approve: 'APPROVED', info: 'INFO_REQUESTED', reject: 'REJECTED' };
-  c.status = map[decision]; c.decisionNote = note ? note.trim() : null; c.lockedBy = null; c.lockExpires = null;
+  c.status = map[decision]; c.decisionNote = decisionNote || null; c.lockedBy = null; c.lockExpires = null;
   if (decision === 'approve') c.approvedAt = now;
   c.history.push({ at: now, status: c.status, by: req.user.fullName, note: c.decisionNote || 'Approved for disbursement' });
   audit(req.user, 'CLAIM_' + c.status, c.ticketRef, c.decisionNote || '', req.ip);
