@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { db, POLICY, audit, notify } = require('../store');
+const { db, POLICY, BRANCHES, audit, notify } = require('../store');
 const { auth, role } = require('../middleware/auth');
 const { view, normalizeLock, businessHoursBetween } = require('../claimUtil');
 
@@ -47,10 +47,13 @@ router.get('/history', (req, res) => {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
     return res.status(400).json({ message: 'Month filter must use YYYY-MM format' });
   }
-  const branches = [...new Set(db.users
-    .filter((user) => user.role === 'employee' && user.branch)
-    .map((user) => String(user.branch).trim())
-    .filter(Boolean))].sort();
+  const branches = [...new Set([
+    ...BRANCHES,
+    ...db.users
+      .filter((user) => user.role === 'employee' && user.branch)
+      .map((user) => String(user.branch).trim())
+      .filter(Boolean),
+  ])];
   const branch = String(req.query.branch || 'ALL').trim();
   if (branch !== 'ALL' && !branches.includes(branch)) {
     return res.status(400).json({ message: 'Invalid branch filter' });
